@@ -1,24 +1,6 @@
-# deps
 node_modules/
-
-# hardhat
-contracts/artifacts/
-contracts/cache/
-contracts/typechain-types/
-contracts/coverage/
-contracts/dist/
-
-# next.js
-web/.next/
-web/out/
-web/next-env.d.ts
-
-# env & misc
-.env
-.env.local
-*.log
-.DS_Store
-
-# OMC local artifacts
-.omc/
-web/public/photo_2026-07-18_22-51-24.jpg
+.next/
+out/
+.env*.local
+next-env.d.ts
+*.tsbuildinfo
