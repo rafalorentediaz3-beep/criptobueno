@@ -54,5 +54,8 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => a.symbol.localeCompare(b.symbol))
     .slice(0, 250);
 
-  return NextResponse.json({ stocks }, { headers: { "Cache-Control": "public, max-age=3600" } });
+  return NextResponse.json(
+    { stocks },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } },
+  );
 }

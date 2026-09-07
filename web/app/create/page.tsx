@@ -143,7 +143,12 @@ export default function CreatePage() {
     let cancelled = false;
     setStocksLoading(true);
     const timer = setTimeout(() => {
-      fetch(`/api/robinhood/stocks${stockQuery.trim() ? `?search=${encodeURIComponent(stockQuery.trim())}` : ""}`)
+      fetch(
+        `/api/robinhood/stocks?v=3${
+          stockQuery.trim() ? `&search=${encodeURIComponent(stockQuery.trim())}` : ""
+        }`,
+        { cache: "no-store" },
+      )
       .then(async (response) => {
         if (!response.ok) throw new Error("stock catalogue unavailable");
         return (await response.json()) as { stocks?: RobinhoodStock[] };
