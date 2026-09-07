@@ -24,7 +24,7 @@ export function Header() {
   }, [connected]);
 
   return (
-    <header className="border-b border-neutral-200 bg-white/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-white/70 bg-white/65 shadow-[0_8px_30px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center gap-5 px-4 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <img src="/logo.webp" alt="PotatoPad" className="h-10 w-10 rounded-xl object-cover ring-1 ring-neutral-200" />
@@ -33,7 +33,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 rounded-full bg-neutral-100 p-1 md:flex">
+        <nav className="hidden items-center gap-1 rounded-full border border-white/80 bg-white/55 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl md:flex">
           <Link
             href="/"
             className={`rounded-full px-4 py-2 text-sm transition-colors ${
@@ -66,7 +66,7 @@ export function Header() {
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/create"
-            className={`hidden items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium transition-colors hover:border-neutral-300 hover:bg-neutral-50 sm:flex ${
+            className={`hidden items-center gap-2 rounded-full border border-white/80 bg-white/60 px-4 py-2 text-sm font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_-10px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-colors hover:border-white hover:bg-white/80 sm:flex ${
               pathname === "/create"
                 ? "ring-2 ring-neutral-900/10"
                 : "text-neutral-800"
@@ -79,16 +79,16 @@ export function Header() {
               const ready = mounted;
               const connected = ready && account && chain;
               return !connected ? (
-                <button type="button" onClick={openConnectModal} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm transition-colors hover:bg-neutral-50">
+                <button type="button" onClick={openConnectModal} className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/60 px-4 py-2 text-sm font-medium text-neutral-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_-10px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-colors hover:bg-white/80">
                   <Wallet className="h-4 w-4" /> <span className="hidden sm:inline">Connect</span>
                 </button>
               ) : chain.unsupported ? (
                 <button type="button" onClick={openChainModal} className="rounded-full bg-red-50 px-4 py-2 text-sm font-medium text-red-600">Wrong network</button>
               ) : (
                 <div className="flex items-center gap-2">
-                  {myProfileHref && <Link href={myProfileHref} aria-label="My profile" className="hidden h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 hover:bg-neutral-50 sm:flex"><User className="h-4 w-4" /></Link>}
-                  <button type="button" onClick={openChainModal} className="hidden h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 hover:bg-neutral-50 lg:flex"><BarChart3 className="h-4 w-4" /></button>
-                  <button type="button" onClick={openAccountModal} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3.5 py-2 font-mono text-xs font-medium text-neutral-800 shadow-sm hover:bg-neutral-50">{account.displayName}</button>
+                  {myProfileHref && <Link href={myProfileHref} aria-label="My profile" className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white/55 text-neutral-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_-10px_rgba(15,23,42,0.55)] backdrop-blur-xl hover:bg-white/80 sm:flex"><User className="h-4 w-4" /></Link>}
+                  <button type="button" onClick={openChainModal} className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white/55 text-neutral-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_-10px_rgba(15,23,42,0.55)] backdrop-blur-xl hover:bg-white/80 lg:flex"><BarChart3 className="h-4 w-4" /></button>
+                          <button type="button" onClick={openAccountModal} className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/60 px-3.5 py-2 font-mono text-xs font-medium text-neutral-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_-10px_rgba(15,23,42,0.55)] backdrop-blur-xl hover:bg-white/80">{account.displayName}</button>
                 </div>
               );
             }}
