@@ -1,23 +1,16 @@
-import type { MetadataRoute } from "next";
-import { loadFeed } from "@/lib/tokenFeed";
+export const dynamic = "force-static";
 
-const BASE = "https://potato.fm";
+export async function GET() {
+  const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</urlset>`;
 
-export const revalidate = 3600;
-
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes: MetadataRoute.Sitemap = ["", "/create", "/analytics", "/terms", "/privacy"].map(
-    (p) => ({ url: `${BASE}${p}`, changeFrequency: "daily", priority: p === "" ? 1 : 0.6 }),
-  );
-
-  // Recent token pages from the cached feed (best-effort — never fail the sitemap).
-  let tokens: MetadataRoute.Sitemap = [];
-  try {
-    const feed = await loadFeed();
-    tokens = feed.creations
-      .slice(0, 500)
-      .map((c) => ({ url: `${BASE}/token/${c.token}`, changeFrequency: "hourly", priority: 0.7 }));
-  } catch {
+  return new Response(body, {
+    headers: {
+      "Content-Type": "application/xml",
+    },
+  });
+}
     /* feed unavailable — static routes still ship */
   }
 
