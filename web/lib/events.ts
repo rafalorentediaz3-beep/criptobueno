@@ -175,7 +175,10 @@ export function useLaunchActivity() {
       });
 
       try {
-        const res = await fetch("/api/tokens", { cache: "no-store" });
+        const res = await fetch("/api/tokens", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(15_000),
+        });
         if (!res.ok) {
           if (previous && previous.creations.length > 0) return asStale(previous);
           return {

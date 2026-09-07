@@ -82,8 +82,18 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
   const [page, setPage] = useState(0);
   const [shareMsg, setShareMsg] = useState("");
   const [editing, setEditing] = useState(false);
+  const [feedTimedOut, setFeedTimedOut] = useState(false);
   // Public identity: falls back to a derived name server-side, so this is never blank.
   const { data: profile } = useProfile(address);
+
+  useEffect(() => {
+    if (!isLoading || allCreations.length > 0 || feedState === "stale") {
+      setFeedTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setFeedTimedOut(true), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [allCreations.length, feedState, isLoading]);
 
   // Newest first — feed scan order is not chronological; profiles should feel like a timeline.
   const mine = useMemo(() => {
@@ -217,7 +227,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
     );
   }
 
-  if (isLoading && allCreations.length === 0 && feedState !== "stale") {
+  if (isLoading && allCreations.length === 0 && feedState !== "stale" && !feedTimedOut) {
     return (
       <div>
         <div className="card mb-6 h-28 animate-pulse bg-neutral-900/80" />
@@ -230,7 +240,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
     );
   }
 
-  if (feedState === "unavailable" && allCreations.length === 0) {
+  if (feedState === "unavailable" && allCreations.length === 0 && !feedTimedOut) {
     return (
       <div className="card mx-auto max-w-lg p-10 text-center">
         <h2 className="text-lg font-bold text-neutral-100">Creator activity unavailable</h2>
