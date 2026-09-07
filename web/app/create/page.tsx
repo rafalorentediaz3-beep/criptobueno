@@ -386,7 +386,7 @@ export default function CreatePage() {
         ? "Planted"
         : vampBlocked
           ? "Deployment restricted"
-          : "Plant token";
+          : "Launch token";
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -401,7 +401,7 @@ export default function CreatePage() {
               </p>
             </div>
 
-            <form id="plant-form" onSubmit={onSubmit} className="space-y-4">
+            <form id="launch-form" onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label htmlFor="name" className={labelCls}>
                   Token name
@@ -753,7 +753,7 @@ export default function CreatePage() {
             )}
             <button
               type="submit"
-              form="plant-form"
+              form="launch-form"
               disabled={!formValid || tx.busy || tx.confirmed || staleClient}
               className={`w-full rounded-xl py-3.5 text-xs font-bold uppercase tracking-widest transition-all ${
                 formValid && !tx.busy && !tx.confirmed && !staleClient

@@ -45,10 +45,10 @@ export async function GET(req: NextRequest) {
         symbol,
         name: item.simple_name || item.name!,
         type: item.type!,
-        // Robinhood supplies the canonical symbol/name catalogue. This public
-        // company-logo CDN covers the major listed stocks and the UI supplies
-        // a deterministic ticker fallback for symbols without an image.
-        imageUrl: `https://companiesmarketcap.com/img/company-logos/64/${encodeURIComponent(symbol)}.png`,
+        // Robinhood supplies the canonical symbol/name catalogue. FMP's public
+        // symbol endpoint provides the issuer logo, including many OTC symbols
+        // that do not exist in the large-cap logo catalogues.
+        imageUrl: `https://financialmodelingprep.com/image-stock/${encodeURIComponent(symbol)}.png`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))
