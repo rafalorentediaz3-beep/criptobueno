@@ -127,11 +127,11 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
       pageItems.map((c) => c.token).join(","),
     ],
     enabled: pageItems.length > 0,
-    staleTime: 30_000,
+    staleTime: 60_000,
     queryFn: async () => {
       const map = new Map<string, number | null>();
-      // Bound concurrency: batches of 8 individual reads (no Multicall3 assumed).
-      const CONCURRENCY = 8;
+      // Keep enough parallel reads to avoid serialising a whole profile page.
+      const CONCURRENCY = 20;
       for (let i = 0; i < pageItems.length; i += CONCURRENCY) {
         const batch = pageItems.slice(i, i + CONCURRENCY);
         await Promise.all(

@@ -238,10 +238,12 @@ async function scan(): Promise<FeedPayload> {
   // Active pad(s): always fresh.
   const activeRound: PadTag[] = [];
   {
+    const activeResults = await Promise.all(
+      activePads.map((p) => scanPadRange(p.address, p.startBlock, latest)),
+    );
     let failed = 0;
     let total = 0;
-    for (const p of activePads) {
-      const r = await scanPadRange(p.address, p.startBlock, latest);
+    for (const r of activeResults) {
       activeRound.push(...r.tagged);
       failed += r.failed;
       total += r.total;
@@ -257,12 +259,24 @@ async function scan(): Promise<FeedPayload> {
   ];
   const tsByBlock = new Map<bigint, number>();
   const TS_CHUNK = 20;
-  for (let i = 0; i < blockNums.length; i += TS_CHUNK) {
-    const blocks = await Promise.all(
-      blockNums.slice(i, i + TS_CHUNK).map((n) => client.getBlock({ blockNumber: n }).catch(() => null)),
-    );
-    for (const b of blocks) if (b) tsByBlock.set(b.number, Number(b.timestamp));
-  }
+  const timestampTask = (async () => {
+    for (let i = 0; i < blockNums.length; i += TS_CHUNK) {
+      const blocks = await Promise.all(
+        blockNums
+          .slice(i, i + TS_CHUNK)
+          .map((n) => client.getBlock({ blockNumber: n }).catch(() => null)),
+      );
+      for (const b of blocks) if (b) tsByBlock.set(b.number, Number(b.timestamp));
+    }
+  })();
+
+  // Volume is optional enrichment; run it while block timestamps are loading.
+  const volumeTask = fetchVolumes(
+    tagged
+      .map((t) => t.log.args.token)
+      .filter((token): token is Address => Boolean(token)),
+  );
+  await Promise.all([timestampTask, volumeTask]);
 
   // A token belongs to exactly one pad; dedupe by token address.
   const kindByPad = new Map(pads.map((p) => [p.address.toLowerCase(), p.kind ?? "direct"] as const));
@@ -292,12 +306,8 @@ async function scan(): Promise<FeedPayload> {
   }
   // Enrich with 24h volume (best-effort) so the client can offer a "Recent buys" sort.
   const creations = [...byToken.values()];
-  try {
-    const vols = await fetchVolumes(creations.map((c) => c.token));
-    for (const c of creations) c.volume24Usd = vols.get(c.token.toLowerCase()) ?? 0;
-  } catch {
-    /* leave volumes at 0 */
-  }
+  const vols = await volumeTask;
+  for (const c of creations) c.volume24Usd = vols.get(c.token.toLowerCase()) ?? 0;
   // A partial scan (some window failed) surfaces as "unavailable" so the client
   // shows a warm cache rather than treating a truncated list as complete.
   return stamp(creations, unavailable ? "unavailable" : "fresh", Date.now());
