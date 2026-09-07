@@ -1,22 +1,15 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Search, User, Wallet } from "lucide-react";
+import { BarChart3, User, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { getAddress } from "viem";
 import { useAccount } from "wagmi";
-import { useSearch } from "@/components/SearchContext";
-
-// The chain-switcher pill is a dev convenience (hopping between localhost /
-// testnet / mainnet). Production builds serve one chain — never show it there.
-// NODE_ENV is inlined at build time, so the button is compiled out of prod bundles.
-const SHOW_CHAIN_SWITCHER = process.env.NODE_ENV === "development";
 
 export function Header() {
   const pathname = usePathname();
-  const { query, setQuery } = useSearch();
   const { address: connected } = useAccount();
   // EVERY connected wallet has a profile now (auto-named until claimed, editable
   // there), so this no longer waits on the launch feed or requires having planted
@@ -31,134 +24,76 @@ export function Header() {
   }, [connected]);
 
   return (
-    <header className="border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <img src="/logo.webp" alt="PotatoPad" className="h-11 w-11 rounded-lg object-cover" />
-          <span className="flex flex-col leading-none">
-            <span className="text-lg font-bold tracking-tight text-neutral-100">
-              Potato <span className="text-amber-500">Pad</span>
-            </span>
-            <span className="mt-1 whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
-              People&apos;s launchpad
-            </span>
+    <header className="border-b border-neutral-200 bg-white/90 backdrop-blur-md">
+      <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center gap-5 px-4 sm:px-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5">
+          <img src="/logo.webp" alt="PotatoPad" className="h-10 w-10 rounded-xl object-cover ring-1 ring-neutral-200" />
+          <span className="hidden text-base font-semibold tracking-tight text-neutral-900 sm:block">
+            Potato<span className="text-neutral-400">Pad</span>
           </span>
         </Link>
 
-        {/* Search — filters the Discover list client-side */}
-        <div className="relative mx-auto hidden w-full max-w-md md:block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600" />
-          <input
-            type="search"
-            aria-label="Search coins by name or symbol"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search coins by name or symbol…"
-            className="w-full rounded-lg border border-neutral-800 bg-neutral-900 py-2 pl-9 pr-3 text-sm text-neutral-200 placeholder-neutral-600 outline-none transition-colors focus:border-amber-500/60"
-          />
-        </div>
-
-        <nav className="ml-auto flex items-center gap-1 md:ml-0">
+        <nav className="hidden items-center gap-1 rounded-full bg-neutral-100 p-1 md:flex">
           <Link
             href="/"
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            className={`rounded-full px-4 py-2 text-sm transition-colors ${
               pathname === "/"
-                ? "text-amber-500"
-                : "text-neutral-400 hover:text-neutral-100"
+                ? "bg-white font-medium text-neutral-900 shadow-sm"
+                : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            Discover
+            Explore
           </Link>
           <Link
             href="/feedback"
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            className={`rounded-full px-4 py-2 text-sm transition-colors ${
               pathname === "/feedback"
-                ? "text-amber-500"
-                : "text-neutral-400 hover:text-neutral-100"
+                ? "bg-white font-medium text-neutral-900 shadow-sm"
+                : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            Feedback
+            Forum
           </Link>
-          <Link
-            href="/create"
-            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
-              pathname === "/create"
-                ? "text-amber-500"
-                : "text-neutral-200 hover:text-amber-400"
-            }`}
-          >
-            Plant a Coin
+          <Link href="/analytics" className={`rounded-full px-4 py-2 text-sm transition-colors ${
+            pathname.startsWith("/analytics")
+              ? "bg-white font-medium text-neutral-900 shadow-sm"
+              : "text-neutral-500 hover:text-neutral-900"
+          }`}>
+            Analytics
           </Link>
         </nav>
 
-        <ConnectButton.Custom>
-          {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
-            const ready = mounted;
-            const connected = ready && account && chain;
-            return (
-              <div
-                className="shrink-0"
-                {...(!ready && {
-                  "aria-hidden": true,
-                  style: { opacity: 0, pointerEvents: "none" as const, userSelect: "none" as const },
-                })}
-              >
-                {!connected ? (
-                  <button
-                    type="button"
-                    onClick={openConnectModal}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-neutral-900 transition-colors hover:bg-amber-400"
-                  >
-                    <Wallet className="h-4 w-4" />
-                    <span className="hidden sm:inline">Connect</span>
-                  </button>
-                ) : chain.unsupported ? (
-                  <button
-                    type="button"
-                    onClick={openChainModal}
-                    className="inline-flex items-center gap-2 rounded-lg bg-red-500/20 px-3.5 py-2 text-sm font-semibold text-red-400 ring-1 ring-inset ring-red-500/40 transition-colors hover:bg-red-500/30"
-                  >
-                    Wrong network
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {myProfileHref && (
-                      <Link
-                        href={myProfileHref}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors ${
-                          pathname.toLowerCase() === myProfileHref.toLowerCase()
-                            ? "text-amber-500"
-                            : "text-neutral-400 hover:text-neutral-100"
-                        }`}
-                        aria-label="My profile"
-                      >
-                        <User className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">My profile</span>
-                      </Link>
-                    )}
-                    {SHOW_CHAIN_SWITCHER && (
-                      <button
-                        type="button"
-                        onClick={openChainModal}
-                        className="hidden items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 py-2 text-xs font-medium text-neutral-300 transition-colors hover:border-amber-500/40 sm:inline-flex"
-                      >
-                        {chain.name}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={openAccountModal}
-                      className="inline-flex items-center gap-2 rounded-lg border border-[#CCFF00]/40 bg-[#CCFF00]/10 px-3 py-2 font-mono text-xs font-semibold text-[#CCFF00] shadow-[0_0_12px_rgba(204,255,0,0.15)] transition-colors hover:bg-[#CCFF00]/15"
-                    >
-                      <Wallet className="h-3.5 w-3.5" />
-                      {account.displayName}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          }}
-        </ConnectButton.Custom>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/create"
+            className={`hidden items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium transition-colors hover:border-neutral-300 hover:bg-neutral-50 sm:flex ${
+              pathname === "/create"
+                ? "ring-2 ring-neutral-900/10"
+                : "text-neutral-800"
+            }`}
+          >
+            <span className="text-lg leading-none">+</span> Create
+          </Link>
+          <ConnectButton.Custom>
+            {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+              const ready = mounted;
+              const connected = ready && account && chain;
+              return !connected ? (
+                <button type="button" onClick={openConnectModal} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm transition-colors hover:bg-neutral-50">
+                  <Wallet className="h-4 w-4" /> <span className="hidden sm:inline">Connect</span>
+                </button>
+              ) : chain.unsupported ? (
+                <button type="button" onClick={openChainModal} className="rounded-full bg-red-50 px-4 py-2 text-sm font-medium text-red-600">Wrong network</button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {myProfileHref && <Link href={myProfileHref} aria-label="My profile" className="hidden h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 hover:bg-neutral-50 sm:flex"><User className="h-4 w-4" /></Link>}
+                  <button type="button" onClick={openChainModal} className="hidden h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 hover:bg-neutral-50 lg:flex"><BarChart3 className="h-4 w-4" /></button>
+                  <button type="button" onClick={openAccountModal} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3.5 py-2 font-mono text-xs font-medium text-neutral-800 shadow-sm hover:bg-neutral-50">{account.displayName}</button>
+                </div>
+              );
+            }}
+          </ConnectButton.Custom>
+        </div>
       </div>
     </header>
   );

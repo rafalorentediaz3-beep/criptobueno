@@ -4,13 +4,13 @@
 
 @layer base {
   body {
-    @apply bg-[#050505] text-neutral-200 antialiased selection:bg-amber-500/30;
+    @apply bg-[#f5f6f7] text-neutral-900 antialiased selection:bg-lime-200;
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-neutral-800 bg-neutral-900/50;
+    @apply rounded-2xl border border-neutral-200 bg-white;
   }
 
   .btn {
@@ -18,11 +18,11 @@
   }
 
   .btn-primary {
-    @apply btn bg-amber-500 text-neutral-900 hover:bg-amber-400;
+    @apply btn bg-neutral-900 text-white hover:bg-neutral-700;
   }
 
   .btn-secondary {
-    @apply btn border border-neutral-800 bg-neutral-900 text-neutral-300 hover:border-amber-500/40 hover:text-neutral-100;
+    @apply btn border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-950;
   }
 
   .btn-danger {
@@ -30,7 +30,7 @@
   }
 
   .input {
-    @apply w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3.5 py-2.5 text-neutral-100 placeholder-neutral-600 outline-none transition-colors focus:border-amber-500/60;
+    @apply w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5;
   }
 
   .label {
@@ -38,7 +38,7 @@
   }
 
   .skeleton {
-    @apply animate-pulse rounded-lg bg-neutral-800/80;
+    @apply animate-pulse rounded-lg bg-neutral-200;
   }
 }
 
