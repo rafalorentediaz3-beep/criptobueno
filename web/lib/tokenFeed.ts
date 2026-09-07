@@ -55,7 +55,7 @@ export interface CreationDTO {
   pad: Address;
   /** 24h USD volume from GeckoTerminal (0 if unindexed) — drives "Recent buys". */
   volume24Usd: number;
-  /** Which pad kind launched it: "curve" (bonding curve) or "direct" (legacy). */
+  /** Which pad kind launched it: curve, legacy direct, or direct-to-v4. */
   kind: PadKind;
 }
 export type FeedState = "fresh" | "stale" | "unavailable";

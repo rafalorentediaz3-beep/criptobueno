@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { bytesToHex, decodeEventLog } from "viem";
 import { useAccount, useReadContracts, useSignMessage } from "wagmi";
-import { potatoCurvePadAbi } from "@/lib/abi";
+import { potatoCurvePadAbi, potatoV4PadAbi } from "@/lib/abi";
 import { SITE_URL } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
 import { useAncientTokens } from "@/lib/ancient";
@@ -84,7 +84,8 @@ export default function CreatePage() {
   const queryClient = useQueryClient();
   // Curve pad is the PRIMARY launcher: every new launch (plain or holder-rewards)
   // goes here. The direct pad stays read-only for coins already launched on it.
-  const { curvePad, chainId, canLaunch } = usePad();
+  const { curvePad, v4Pad, chainId, canLaunch, canV4Launch } = usePad();
+  const canCreate = canLaunch || canV4Launch;
   const tx = useTx();
   const { tokens: ancientTokens } = useAncientTokens();
   const { address: userAddress } = useAccount();
@@ -147,6 +148,8 @@ export default function CreatePage() {
   // True when the server reports a newer pad than this bundle was built with.
   const [staleClient, setStaleClient] = useState(false);
   const [creatorCutPct, setCreatorCutPct] = useState(0);
+  const [launchMode, setLaunchMode] = useState<"v3" | "v4">("v3");
+  const [v4Fee, setV4Fee] = useState(3_000);
   const [launchWarning, setLaunchWarning] = useState("");
   const launchWarningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holderCutPct = CREATOR_HALF_PCT - creatorCutPct;
@@ -240,32 +243,38 @@ export default function CreatePage() {
   const symbolBlocked = symbol.trim().length > 0 && blacklist.has(symbol.trim().toLowerCase());
   const vampBlocked = nameBlocked || symbolBlocked;
 
+  const isV4 = launchMode === "v4";
   const formValid =
     name.trim().length > 0 &&
     symbol.trim().length > 0 &&
     image.trim().length > 0 &&
     !vampBlocked &&
     devBuyWei !== undefined &&
-    !devBuyTooLarge;
+    !devBuyTooLarge &&
+    (!isV4 || devBuyWei === 0n) &&
+    (isV4 ? canV4Launch : canLaunch);
 
   useEffect(() => {
     if (!tx.confirmed || !tx.receipt) return;
     let target = "/";
     let launchedToken: string | undefined;
     for (const log of tx.receipt.logs) {
-      try {
-        const event = decodeEventLog({
-          abi: potatoCurvePadAbi,
-          eventName: "TokenCreated",
-          data: log.data,
-          topics: log.topics,
-        });
-        launchedToken = event.args.token as string;
-        target = `/token/${launchedToken}`;
-        break;
-      } catch {
-        // not a TokenCreated log (e.g. a dev-buy's Buy log) — keep scanning
+      for (const abi of [potatoCurvePadAbi, potatoV4PadAbi]) {
+        try {
+          const event = decodeEventLog({
+            abi,
+            eventName: "TokenCreated",
+            data: log.data,
+            topics: log.topics,
+          });
+          launchedToken = event.args.token as string;
+          target = `/token/${launchedToken}`;
+          break;
+        } catch {
+          // not a TokenCreated log (e.g. a dev-buy's Buy log) — keep scanning
+        }
       }
+      if (launchedToken) break;
     }
     // Save the description off-chain (gasless, creator-signed). Best-effort: the
     // token is fully launched regardless, so a declined signature or a failed
@@ -347,7 +356,7 @@ export default function CreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx.confirmed, tx.receipt, router, queryClient]);
 
-  if (!canLaunch) {
+  if (!canCreate) {
     return <NotDeployed chainId={chainId} />;
   }
 
@@ -362,6 +371,8 @@ export default function CreatePage() {
         showLaunchWarning("Add a token image before launching.");
       } else if (devBuyWei === undefined || devBuyTooLarge) {
         showLaunchWarning("Adjust the dev buy amount before launching.");
+      } else if (isV4 && devBuyWei !== 0n) {
+        showLaunchWarning("Uniswap v4 launches do not include a dev buy yet. Set it to 0.");
       } else {
         showLaunchWarning("Complete the required fields before launching.");
       }
@@ -402,9 +413,20 @@ export default function CreatePage() {
       twitter: normalizeSocialUrl(twitter, "twitter") ?? "",
       telegram: normalizeSocialUrl(telegram, "telegram") ?? "",
     };
-    const common = { address: curvePad, abi: potatoCurvePadAbi, value: devBuyWei } as const;
     const trimmedName = name.trim();
     const ticker = symbol.trim().toUpperCase();
+
+    if (isV4) {
+      tx.writeContract({
+        address: v4Pad,
+        abi: potatoV4PadAbi,
+        functionName: "createToken",
+        args: [trimmedName, ticker, meta, salt, v4Fee],
+      });
+      return;
+    }
+
+    const common = { address: curvePad, abi: potatoCurvePadAbi, value: devBuyWei } as const;
 
     // Both entry points launch identically — same locked LP, same treasury cut.
     // createRewardToken additionally splits the creator half with holders.
@@ -660,9 +682,15 @@ export default function CreatePage() {
                   className={`${inputCls} font-mono tabular-nums`}
                   placeholder="0.00"
                   inputMode="decimal"
+                  disabled={isV4}
                   value={devBuy}
                   onChange={(e) => setDevBuy(e.target.value)}
                 />
+                {isV4 && (
+                  <p className="text-xs text-neutral-600">
+                    v4 launches start with liquidity only. Buy after launch through Uniswap.
+                  </p>
+                )}
                 {devBuy.trim() !== "" && devBuyWei === undefined && (
                   <p className="text-xs text-rose-400">Enter a valid amount.</p>
                 )}
@@ -677,9 +705,70 @@ export default function CreatePage() {
 
               <div className="space-y-3 border-t border-neutral-100 pt-5">
                 <div>
-                  <label className={labelCls}>Fees</label>
+                  <label className={labelCls}>Launch venue</label>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={!canLaunch}
+                      onClick={() => setLaunchMode("v3")}
+                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                        launchMode === "v3"
+                          ? "border-amber-500/60 bg-amber-500/10"
+                          : "border-neutral-200 bg-white hover:border-neutral-300"
+                      } ${!canLaunch ? "cursor-not-allowed opacity-40" : ""}`}
+                    >
+                      <span className="block text-xs font-bold text-neutral-900">Uniswap v3</span>
+                      <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
+                        Bonding curve + dev buy.
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canV4Launch}
+                      onClick={() => {
+                        setDevBuy("");
+                        setLaunchMode("v4");
+                      }}
+                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                        launchMode === "v4"
+                          ? "border-lime-400 bg-lime-50"
+                          : "border-neutral-200 bg-white hover:border-neutral-300"
+                      } ${!canV4Launch ? "cursor-not-allowed opacity-40" : ""}`}
+                    >
+                      <span className="block text-xs font-bold text-neutral-900">Uniswap v4</span>
+                      <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
+                        Locked single-sided liquidity.
+                      </span>
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                {isV4 && (
+                  <div className="space-y-1.5 rounded-xl border border-neutral-200 bg-white p-3.5">
+                    <label htmlFor="v4fee" className={labelCls}>
+                      Trading fee
+                    </label>
+                    <select
+                      id="v4fee"
+                      className={inputCls}
+                      value={v4Fee}
+                      onChange={(e) => setV4Fee(Number(e.target.value))}
+                    >
+                      <option value={100}>0.01%</option>
+                      <option value={500}>0.05%</option>
+                      <option value={3000}>0.30%</option>
+                      <option value={10000}>1.00%</option>
+                    </select>
+                    <p className="text-[10px] leading-relaxed text-neutral-600">
+                      Fixed when the pool is initialized; it cannot be changed later.
+                    </p>
+                  </div>
+                )}
+                {!isV4 ? (
+                  <>
+                    <div>
+                      <label className={labelCls}>Fees</label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setRewardsOn(false)}
@@ -708,10 +797,10 @@ export default function CreatePage() {
                       Holders earn fees.
                     </span>
                   </button>
-                </div>
+                    </div>
 
-                {rewardsOn && (
-                  <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
+                    {rewardsOn && (
+                      <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
                     <div className="flex items-baseline justify-between">
                       <label htmlFor="creatorcut" className={labelCls}>
                         Your cut
@@ -757,6 +846,16 @@ export default function CreatePage() {
 
                     <p className="text-[10px] leading-relaxed text-neutral-600">
                       Fee settings are fixed after launch.
+                    </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
+                    <label className={labelCls}>Fee recipients</label>
+                    <p className="mt-1 text-[10px] leading-relaxed text-neutral-600">
+                      v4 launches use the locked fee locker: 50% to the creator and 50% to
+                      treasury. Holder rewards are available on the v3 launch path.
                     </p>
                   </div>
                 )}

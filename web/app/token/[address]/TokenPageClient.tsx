@@ -39,6 +39,7 @@ export default function TokenPageClient() {
   const ancient = token ? ancientByAddress.get(token.toLowerCase()) : undefined;
 
   const isCurve = resolved.kind === "curve";
+  const isV4 = resolved.kind === "v4";
   const onCurve = isCurve && !resolved.bonded; // pre-bond curve phase (still trades on Uniswap)
   const isAncient = !resolved.resolved && !!ancient;
   const creator = resolved.creator;
@@ -250,6 +251,9 @@ export default function TokenPageClient() {
           symbol={symbol}
           pool={pool}
           isCurve={isCurve}
+          isV4={isV4}
+          v4PoolId={resolved.poolId}
+          v4Fee={resolved.feeTier}
           bonded={resolved.bonded}
         />
         {/* Renders only for holder-rewards launches; a no-op otherwise. */}
@@ -261,6 +265,7 @@ export default function TokenPageClient() {
           token={token}
           symbol={symbol}
           pad={resolved.pad}
+          isV4={isV4}
         />
       </div>
     </div>

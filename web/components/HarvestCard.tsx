@@ -4,7 +4,7 @@ import { Coins, Leaf } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Address } from "viem";
 import { useAccount, useReadContract } from "wagmi";
-import { potatoFeeLockerAbi, potatoPadAbi } from "@/lib/abi";
+import { potatoFeeLockerAbi, potatoPadAbi, potatoV4PadAbi } from "@/lib/abi";
 import { PAD_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
 import { formatEth } from "@/lib/format";
@@ -52,8 +52,8 @@ function sameCtx(a: FlowCtx, b: FlowCtx): boolean {
 }
 
 /**
- * v2 fee card: the launch LP is locked forever in the {PotatoFeeLocker}. Its
- * Uniswap V3 swap fees flow out in two on-chain steps:
+ * Fee card: the launch position is locked forever in the V3/V4 fee locker.
+ * Swap fees flow out in two on-chain steps:
  *   1. {collect} (permissionless) harvests accrued pool fees INTO the locker,
  *      auto-pays the treasury its 50%, and sets aside the creator's 50%.
  *   2. {claim} (creator-only) withdraws that set-aside share to the wallet —
@@ -70,6 +70,7 @@ export function HarvestCard({
   token,
   symbol,
   pad,
+  isV4 = false,
 }: {
   creator: Address;
   lpTokenId: bigint;
@@ -79,6 +80,8 @@ export function HarvestCard({
   symbol: string;
   /** The pad that launched this token (curve, primary, or legacy) — its locker holds the fees. */
   pad: Address;
+  /** v4 uses the same collect/claim selectors but a PoolManager position. */
+  isV4?: boolean;
 }) {
   // Lock-at-launch: the single-sided position is minted straight into the locker,
   // so its swap fees are collectable/claimable from block one — even pre-bond.
@@ -91,7 +94,7 @@ export function HarvestCard({
 
   const { data: locker } = useReadContract({
     address: pad,
-    abi: potatoPadAbi,
+    abi: isV4 ? potatoV4PadAbi : potatoPadAbi,
     functionName: "locker",
     query: { enabled: pad !== ZERO_ADDRESS },
   });
@@ -131,8 +134,9 @@ export function HarvestCard({
   const claimablesKnown =
     creatorClaimableWeth !== undefined && creatorClaimableToken !== undefined;
   const hasClaimable = claimableWeth > 0n || claimableToken > 0n;
-  const hasUncollected =
-    (accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n;
+  const hasUncollected = isV4
+    ? true
+    : (accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n;
 
   // Live claimable snapshot for timeout callbacks (avoid stale closures).
   const claimableRef = useRef({ weth: claimableWeth, token: claimableToken, known: claimablesKnown });
@@ -385,7 +389,8 @@ export function HarvestCard({
   // Creators realize WETH only — the launched-token side is burned on the current
   // pad. (Legacy-pad tokens still deliver their token share on claim, just not
   // shown; the card presents the WETH-only burn model everywhere.)
-  const isBurnPad = pad.toLowerCase() === (PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS).toLowerCase();
+  const isBurnPad =
+    isV4 || pad.toLowerCase() === (PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS).toLowerCase();
 
   return (
     <div className="card p-5">
@@ -435,4 +440,3 @@ export function HarvestCard({
     </div>
   );
 }
-

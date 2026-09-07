@@ -191,6 +191,63 @@ export const quoterV2Abi = [
   },
 ] as const;
 
+/** Uniswap v4 Quoter exact-input single-hop call. */
+export const v4QuoterAbi = [
+  {
+    inputs: [
+      {
+        components: [
+          {
+            components: [
+              { internalType: "address", name: "currency0", type: "address" },
+              { internalType: "address", name: "currency1", type: "address" },
+              { internalType: "uint24", name: "fee", type: "uint24" },
+              { internalType: "int24", name: "tickSpacing", type: "int24" },
+              { internalType: "address", name: "hooks", type: "address" },
+            ],
+            internalType: "struct PoolKey",
+            name: "poolKey",
+            type: "tuple",
+          },
+          { internalType: "bool", name: "zeroForOne", type: "bool" },
+          { internalType: "uint128", name: "exactAmount", type: "uint128" },
+          { internalType: "bytes", name: "hookData", type: "bytes" },
+        ],
+        internalType: "struct IV4Quoter.QuoteExactSingleParams",
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "quoteExactInputSingle",
+    outputs: [
+      { internalType: "uint256", name: "amountOut", type: "uint256" },
+      { internalType: "uint256", name: "gasEstimate", type: "uint256" },
+    ],
+    // The deployed quoter uses revert-based simulation and is intentionally
+    // nonpayable; an eth_call is still the correct read operation.
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+/**
+ * Universal Router v2 entry point used for the v4 buy path. The command
+ * sequence wraps native ETH and executes V4_SWAP actions atomically.
+ */
+export const universalRouterAbi = [
+  {
+    inputs: [
+      { internalType: "bytes", name: "commands", type: "bytes" },
+      { internalType: "bytes[]", name: "inputs", type: "bytes[]" },
+      { internalType: "uint256", name: "deadline", type: "uint256" },
+    ],
+    name: "execute",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Price math
 // ---------------------------------------------------------------------------

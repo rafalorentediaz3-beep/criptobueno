@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { getChainId } from "@wagmi/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 import {
   useChainId,
   usePublicClient,
@@ -11,10 +11,11 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { potatoCurvePadAbi, potatoPadAbi } from "@/lib/abi";
+import { potatoCurvePadAbi, potatoPadAbi, potatoV4PadAbi } from "@/lib/abi";
 import {
   CURVE_PAD_ADDRESSES,
   PAD_ADDRESSES,
+  V4_PAD_ADDRESSES,
   WETH_ADDRESSES,
   ZERO_ADDRESS,
   allPadDeployments,
@@ -32,15 +33,18 @@ import { wagmiConfig } from "@/lib/wagmi";
 export function usePad() {
   const chainId = useChainId();
   const curvePad = CURVE_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
+  const v4Pad = V4_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const directPad = PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const weth = WETH_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   return {
     chainId,
     weth,
     curvePad,
+    v4Pad,
     directPad,
     canLaunch: curvePad !== ZERO_ADDRESS,
-    isDeployed: curvePad !== ZERO_ADDRESS || directPad !== ZERO_ADDRESS,
+    canV4Launch: v4Pad !== ZERO_ADDRESS,
+    isDeployed: curvePad !== ZERO_ADDRESS || v4Pad !== ZERO_ADDRESS || directPad !== ZERO_ADDRESS,
   };
 }
 
@@ -235,7 +239,7 @@ export type TxState = ReturnType<typeof useTx>;
 /** How a resolved token was launched. `curve` = single-sided-v3 bonding-curve pad
  *  (trades on Uniswap; pre-migration shows curve UI); `direct` = legacy direct
  *  launch or any migrated curve token, live on Uniswap. */
-export type TokenKind = "curve" | "direct" | "unknown";
+export type TokenKind = "curve" | "direct" | "v4" | "unknown";
 
 export interface ResolvedToken {
   kind: TokenKind;
@@ -245,6 +249,10 @@ export interface ResolvedToken {
   /** The Uniswap pool — non-zero from creation for both curve and direct tokens
    *  (the single-sided-v3 curve trades on Uniswap from block one). */
   pool: Address;
+  /** v4 PoolId (v3/direct deployments leave this undefined). */
+  poolId?: Hex;
+  /** v4 fee tier in hundredths of a bip (v3/direct deployments leave this undefined). */
+  feeTier?: number;
   /** The locked position id — 0 until the curve bonds; direct/legacy: the locked LP id. */
   lpTokenId: bigint;
   /** Curve tokens flip true once bonded (position locked into the fee locker);
@@ -253,7 +261,7 @@ export interface ResolvedToken {
   /** Still in the pre-bond bonding-curve phase (a curve token, not yet bonded).
    *  It still trades on Uniswap — this only drives curve UI (progress + bond). */
   onCurve: boolean;
-  /** Tradeable on the Uniswap SwapRouter now. True for every resolved token. */
+  /** Tradeable on the configured Uniswap router now. True for every resolved token. */
   onUniswap: boolean;
   /** True once some pad claimed the token (non-zero creator). */
   resolved: boolean;
@@ -261,7 +269,7 @@ export interface ResolvedToken {
 }
 
 /**
- * Resolves which pad — the curve pad or a direct/legacy one — a token launched
+ * Resolves which pad — curve, v4, or direct/legacy — a token launched
  * on, and its on-chain state. Reads `curves(token)` on the curve pad and
  * `tokens(token)` on each direct pad (via {allPadDeployments}, curve first);
  * the first with a non-zero creator wins. Lets curve tokens, legacy direct
@@ -282,7 +290,9 @@ export function useTokenPad(token: Address | undefined): ResolvedToken {
     contracts: pads.map((p): any =>
       p.kind === "curve"
         ? { address: p.address, abi: potatoCurvePadAbi, functionName: "curves", args: [token ?? ZERO_ADDRESS] }
-        : { address: p.address, abi: potatoPadAbi, functionName: "tokens", args: [token ?? ZERO_ADDRESS] },
+        : p.kind === "v4"
+          ? { address: p.address, abi: potatoV4PadAbi, functionName: "v4Tokens", args: [token ?? ZERO_ADDRESS] }
+          : { address: p.address, abi: potatoPadAbi, functionName: "tokens", args: [token ?? ZERO_ADDRESS] },
     ),
     query: { enabled: !!token && pads.length > 0 },
   });
@@ -293,6 +303,8 @@ export function useTokenPad(token: Address | undefined): ResolvedToken {
       pad: curvePad,
       creator: ZERO_ADDRESS,
       pool: ZERO_ADDRESS,
+      poolId: undefined,
+      feeTier: undefined,
       lpTokenId: 0n,
       bonded: false,
       onCurve: false,
@@ -319,6 +331,25 @@ export function useTokenPad(token: Address | undefined): ResolvedToken {
             bonded,
             onCurve: !bonded,
             onUniswap: true, // curve tokens trade on Uniswap from block one
+            resolved: true,
+            isLoading,
+          };
+        }
+      } else if (pads[i].kind === "v4") {
+        // v4 pools are identified by a bytes32 PoolId, not a pool contract.
+        const info = res.result as readonly [Address, `0x${string}`, bigint, number];
+        if (info[0] && info[0] !== ZERO_ADDRESS) {
+          return {
+            kind: "v4",
+            pad: pads[i].address,
+            creator: info[0],
+            pool: ZERO_ADDRESS,
+            poolId: info[1],
+            feeTier: Number(info[3]),
+            lpTokenId: info[2],
+            bonded: true,
+            onCurve: false,
+            onUniswap: true,
             resolved: true,
             isLoading,
           };

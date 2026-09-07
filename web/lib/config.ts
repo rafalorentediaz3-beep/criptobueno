@@ -69,6 +69,10 @@ function envAddress(value: string | undefined): Address {
     : ZERO_ADDRESS;
 }
 
+function envBlock(value: string | undefined): bigint | undefined {
+  return value && /^\d+$/.test(value) ? BigInt(value) : undefined;
+}
+
 /**
  * Like {envAddress} but yields `undefined` rather than the zero address, for
  * OPTIONAL config where "unset" must stay distinguishable from "set to zero" —
@@ -81,7 +85,7 @@ function envAddressOpt(value: string | undefined): Address | undefined {
 }
 
 /** Whether a pad is the bonding-curve launcher or the direct-to-Uniswap one. */
-export type PadKind = "curve" | "direct";
+export type PadKind = "curve" | "direct" | "v4";
 
 /** A single pad deployment: its address, the block to scan logs from, and kind. */
 export interface PadDeployment {
@@ -117,12 +121,20 @@ export interface ChainConfig {
   curvePadAddress?: string;
   /** Block to start scanning the curve pad's event logs from (its deploy block). */
   curvePadStartBlock?: bigint;
+  /** Optional direct-to-Uniswap-v4 launcher. v3 remains the default launch path. */
+  v4PadAddress?: string;
+  /** Block to start scanning the v4 pad's event logs from. */
+  v4PadStartBlock?: bigint;
   /** Canonical WETH the single-sided LP pairs against (locker pays fees in WETH). */
   weth: Address;
   /** Uniswap SwapRouter02 for in-app buy/sell. Omit to disable the in-app router. */
   swapRouter?: Address;
   /** Uniswap QuoterV2 for accurate buy/sell estimates. Omit to disable in-app quotes. */
   quoter?: Address;
+  /** Uniswap v4 Quoter for token/WETH PoolKey quotes. */
+  v4Quoter?: Address;
+  /** Uniswap Universal Router (v4 command path). */
+  universalRouter?: Address;
   /** Block to start scanning pad event logs from (the pad's deploy block). */
   padStartBlock: bigint;
   /** Read-only pads from EARLIER deploys that still custody launched tokens. */
@@ -144,11 +156,15 @@ export const CHAINS: ChainConfig[] = [
     padAddress: process.env.NEXT_PUBLIC_PAD_ADDRESS_ROBINHOOD,
     curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_ROBINHOOD,
     curvePadStartBlock: 14_984_900n, // PotatoCurvePad 0x94085E…6069 (~$2.5k open / $44k bond, holder rewards) deploy block 14984902
+    v4PadAddress: process.env.NEXT_PUBLIC_V4_PAD_ADDRESS_ROBINHOOD,
+    v4PadStartBlock: envBlock(process.env.NEXT_PUBLIC_V4_PAD_START_BLOCK_ROBINHOOD) ?? 0n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
     swapRouter: "0xcaf681a66d020601342297493863e78c959e5cb2",
     quoter: "0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7",
+    v4Quoter: "0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94",
+    universalRouter: "0x06AfBA43Fd06227fA663b0DAecF536f6EaA6bf99",
     // The DIRECT pad is read-only now: the curve pad above is the primary launcher.
     // Points at the newest direct deploy (0x88bb90…Ca07, the collectAndClaim locker)
     // so its tokens resolve; older direct pads follow in legacyPads.
@@ -184,6 +200,8 @@ export const CHAINS: ChainConfig[] = [
     padAddress: process.env.NEXT_PUBLIC_PAD_ADDRESS_BASE_SEPOLIA,
     curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_BASE_SEPOLIA,
     curvePadStartBlock: 0n,
+    v4PadAddress: process.env.NEXT_PUBLIC_V4_PAD_ADDRESS_BASE_SEPOLIA,
+    v4PadStartBlock: 0n,
     weth: "0x4200000000000000000000000000000000000006",
     padStartBlock: 0n,
     uniswapSlug: "base_sepolia",
@@ -194,6 +212,8 @@ export const CHAINS: ChainConfig[] = [
     padAddress: process.env.NEXT_PUBLIC_PAD_ADDRESS_LOCALHOST,
     curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_LOCALHOST,
     curvePadStartBlock: 0n, // fresh local chain scans from genesis
+    v4PadAddress: process.env.NEXT_PUBLIC_V4_PAD_ADDRESS_LOCALHOST,
+    v4PadStartBlock: 0n,
     weth: envAddress(process.env.NEXT_PUBLIC_WETH_ADDRESS_LOCALHOST),
     padStartBlock: 0n, // fresh local chain scans from genesis
     // A local chain has no canonical Uniswap deployment, so the router and
@@ -220,6 +240,9 @@ export const PAD_ADDRESSES: Record<number, Address> = byChain((c) => envAddress(
 /** PRIMARY (write) bonding-curve PotatoCurvePad address per chain (zero = not deployed). */
 export const CURVE_PAD_ADDRESSES: Record<number, Address> = byChain((c) => envAddress(c.curvePadAddress));
 
+/** Optional Uniswap v4 launch pad per chain. */
+export const V4_PAD_ADDRESSES: Record<number, Address> = byChain((c) => envAddress(c.v4PadAddress));
+
 /** Canonical WETH per chain (single-sided LP pairs token/WETH; locker pays fees in WETH). */
 export const WETH_ADDRESSES: Record<number, Address> = byChain((c) => c.weth);
 
@@ -243,6 +266,16 @@ export const SWAP_ROUTER_ADDRESSES: Record<number, Address | undefined> = byChai
  */
 export const QUOTER_ADDRESSES: Record<number, Address | undefined> = byChain((c) => c.quoter);
 
+/** Uniswap v4 Quoter per chain, for PoolKey-based exact-input estimates. */
+export const V4_QUOTER_ADDRESSES: Record<number, Address | undefined> = byChain(
+  (c) => c.v4Quoter,
+);
+
+/** Uniswap Universal Router per chain, for v4 command execution. */
+export const UNIVERSAL_ROUTER_ADDRESSES: Record<number, Address | undefined> = byChain(
+  (c) => c.universalRouter,
+);
+
 /**
  * Block to start scanning pad event logs from, per chain. Live RPCs cap
  * eth_getLogs ranges (Alchemy on Robinhood = 10k blocks), so we scan from the
@@ -253,6 +286,9 @@ export const PAD_START_BLOCK: Record<number, bigint> = byChain((c) => c.padStart
 
 /** Block to start scanning the curve pad's logs from, per chain. */
 export const CURVE_PAD_START_BLOCK: Record<number, bigint> = byChain((c) => c.curvePadStartBlock ?? 0n);
+
+/** Block to start scanning the v4 pad's logs from, per chain. */
+export const V4_PAD_START_BLOCK: Record<number, bigint> = byChain((c) => c.v4PadStartBlock ?? 0n);
 
 /**
  * Read-only pads from EARLIER deploys that still custody launched tokens. The
@@ -304,6 +340,13 @@ export function curvePadDeployment(chainId: number): PadDeployment | undefined {
   return { address, startBlock: CURVE_PAD_START_BLOCK[chainId] ?? 0n, kind: "curve" };
 }
 
+/** The optional v4 launcher as a scannable deployment. */
+export function v4PadDeployment(chainId: number): PadDeployment | undefined {
+  const address = V4_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
+  if (address === ZERO_ADDRESS) return undefined;
+  return { address, startBlock: V4_PAD_START_BLOCK[chainId] ?? 0n, kind: "v4" };
+}
+
 /**
  * Every pad to READ for a chain, KIND-TAGGED: the curve pad FIRST (primary going
  * forward, so it wins token-resolution precedence), then the direct pad(s). Used
@@ -312,8 +355,9 @@ export function curvePadDeployment(chainId: number): PadDeployment | undefined {
  */
 export function allPadDeployments(chainId: number): PadDeployment[] {
   const curve = curvePadDeployment(chainId);
+  const v4 = v4PadDeployment(chainId);
   const directs: PadDeployment[] = padDeployments(chainId).map((p) => ({ ...p, kind: "direct" }));
-  const all: PadDeployment[] = curve ? [curve, ...directs] : directs;
+  const all: PadDeployment[] = curve ? [curve, ...(v4 ? [v4] : []), ...directs] : (v4 ? [v4, ...directs] : directs);
   const seen = new Set<string>();
   const out: PadDeployment[] = [];
   for (const p of all) {
@@ -328,6 +372,7 @@ export function allPadDeployments(chainId: number): PadDeployment[] {
 /** True if the chain can launch (curve pad set) OR has any legacy/direct token to show. */
 export function isChainDeployed(chainId: number): boolean {
   return (CURVE_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS) !== ZERO_ADDRESS
+    || (V4_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS) !== ZERO_ADDRESS
     || padDeployments(chainId).length > 0;
 }
 

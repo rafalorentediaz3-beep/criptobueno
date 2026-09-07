@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import type { Address } from "viem";
 import { useWatchContractEvent } from "wagmi";
-import { potatoCurvePadAbi, potatoPadAbi } from "@/lib/abi";
+import { potatoCurvePadAbi, potatoPadAbi, potatoV4PadAbi } from "@/lib/abi";
 import { allPadDeployments, isHiddenToken, ZERO_ADDRESS, type PadKind } from "@/lib/config";
 import { usePad } from "@/lib/hooks";
 import type { FeedState } from "@/lib/tokenFeed";
@@ -135,7 +135,7 @@ export function useLaunchActivity() {
   // Pad addresses come from the CONNECTED chain purely to drive the live event
   // watches below; the feed itself stays pinned to Robinhood (see docstring) so
   // profiles and the ticker work no matter what chain the wallet is on.
-  const { curvePad, directPad } = usePad();
+  const { curvePad, directPad, v4Pad } = usePad();
   const queryClient = useQueryClient();
   // Pads are part of the key so a repoint invalidates cached rows from the old pad.
   const pads = useMemo(() => allPadDeployments(ANALYTICS_CHAIN_ID), []);
@@ -254,8 +254,8 @@ export function useLaunchActivity() {
     );
   }, [cacheKey, queryClient, queryKey]);
 
-  // Live updates: watch the curve pad (primary, all new launches) and the direct
-  // pad (legacy but harmless). Each watch is enabled only when its address is set.
+  // Live updates: watch every configured launcher. Each watch is enabled only
+  // when its address is set.
   useWatchContractEvent({
     address: curvePad,
     abi: potatoCurvePadAbi,
@@ -268,6 +268,13 @@ export function useLaunchActivity() {
     abi: potatoPadAbi,
     eventName: "TokenCreated",
     enabled: directPad !== ZERO_ADDRESS,
+    onLogs: () => queryClient.invalidateQueries({ queryKey }),
+  });
+  useWatchContractEvent({
+    address: v4Pad,
+    abi: potatoV4PadAbi,
+    eventName: "TokenCreated",
+    enabled: v4Pad !== ZERO_ADDRESS,
     onLogs: () => queryClient.invalidateQueries({ queryKey }),
   });
 
