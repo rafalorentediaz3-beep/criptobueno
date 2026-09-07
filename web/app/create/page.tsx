@@ -409,27 +409,21 @@ export default function CreatePage() {
           {/* LEFT: input matrix */}
           <div className="space-y-6 rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_20px_55px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl sm:p-7 md:col-span-3">
             <div className="border-b border-neutral-100 pb-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-lime-700">
-                Create
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
-                Launch a token
+              <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+                Launch token
               </h1>
-              <p className="mt-1.5 text-sm text-neutral-500">
-                Set the basics, add an optional image, and launch.
-              </p>
             </div>
 
             <form id="launch-form" onSubmit={onSubmit} className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-[1.35fr_0.65fr]">
                 <div className="space-y-1.5">
                   <label htmlFor="name" className={labelCls}>
-                    Token name
+                    Name
                   </label>
                   <input
                     id="name"
                     className={`${inputCls} ${nameBlocked ? "border-rose-900/60 bg-rose-950/10 text-rose-300" : ""}`}
-                    placeholder="e.g. Moon Club"
+                    placeholder="Token name"
                     value={name}
                     maxLength={48}
                     onChange={(e) => setName(e.target.value)}
@@ -437,7 +431,7 @@ export default function CreatePage() {
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="symbol" className={labelCls}>
-                    Ticker
+                    Symbol
                   </label>
                   <input
                     id="symbol"
@@ -452,9 +446,8 @@ export default function CreatePage() {
 
               <div className="space-y-2">
                 <label htmlFor="paired-stock" className={labelCls}>
-                  Pair with a Robinhood stock
+                  Pair with
                 </label>
-                <p className="text-[11px] text-neutral-500">Optional reference. It does not create a stock position.</p>
                 <input
                   id="paired-stock"
                   className={`${inputCls} border-white/80 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(15,23,42,0.45)] backdrop-blur-xl`}
@@ -517,8 +510,7 @@ export default function CreatePage() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className={labelCls}>Logo</label>
-                  <span className="text-[10px] text-neutral-400">Optional</span>
+                  <label className={labelCls}>Image</label>
                 </div>
                 <div className="flex gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/80 bg-neutral-50 shadow-sm">
@@ -532,7 +524,7 @@ export default function CreatePage() {
                     )}
                   </div>
                   <label className="flex flex-1 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/55 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-white">
-                    {uploading ? "Uploading…" : "Upload image"}
+                    {uploading ? "Uploading…" : "Choose image"}
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
@@ -549,18 +541,13 @@ export default function CreatePage() {
                       : uploadErr}
                   </p>
                 )}
-                <p className="text-[10px] text-neutral-400">PNG, JPG, GIF, WebP or SVG · max 10 MB.</p>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className={labelCls}>Links</span>
-                  <span className="text-[10px] text-neutral-400">Optional</span>
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="twitter" className={labelCls}>
-                    X / Twitter
+                    X
                   </label>
                   <input
                     id="twitter"
@@ -587,7 +574,7 @@ export default function CreatePage() {
 
               <div className="space-y-1.5">
                 <label htmlFor="website" className={labelCls}>
-                  Website (optional)
+                  Website
                 </label>
                 <input
                   id="website"
@@ -596,15 +583,12 @@ export default function CreatePage() {
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                 />
-                <p className="text-[10px] text-neutral-400">
-                  Leave blank to use {SITE_URL.replace(/^https?:\/\//, "")}.
-                </p>
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="description" className={labelCls}>
-                    Description (optional)
+                    Description
                   </label>
                   <span className="text-[9px] text-neutral-600">
                     {description.length}/{DESCRIPTION_MAX}
@@ -619,13 +603,12 @@ export default function CreatePage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
-                <p className="text-[10px] text-neutral-400">Shown on your token page. Saved after launch.</p>
               </div>
 
               <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="devbuy" className={labelCls}>
-                    Initial dev buy (ETH)
+                    Dev buy (ETH)
                   </label>
                   <span className="text-[9px] text-neutral-600">
                     Max {maxDevBuyWei !== undefined ? formatEth(maxDevBuyWei) : "…"} ETH
@@ -640,21 +623,20 @@ export default function CreatePage() {
                   onChange={(e) => setDevBuy(e.target.value)}
                 />
                 {devBuy.trim() !== "" && devBuyWei === undefined && (
-                  <p className="text-xs text-rose-400">Enter a valid ETH amount.</p>
+                  <p className="text-xs text-rose-400">Enter a valid amount.</p>
                 )}
                 {devBuyTooLarge && (
                   <p className="text-xs text-rose-400">
                     {maxDevBuyWei !== undefined
-                      ? `Capped at ${formatEth(maxDevBuyWei)} ETH (5% of supply) during the anti-snipe window.`
-                      : "Loading the dev-buy cap…"}
+                      ? `Max ${formatEth(maxDevBuyWei)} ETH.`
+                      : "Checking limit…"}
                   </p>
                 )}
               </div>
 
               <div className="space-y-3 border-t border-neutral-100 pt-5">
                 <div>
-                  <label className={labelCls}>Fee model</label>
-                  <p className="mt-1 text-[11px] text-neutral-400">Choose how the creator share is distributed.</p>
+                  <label className={labelCls}>Fees</label>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -668,7 +650,7 @@ export default function CreatePage() {
                   >
                     <span className="block text-xs font-bold text-neutral-900">Standard</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
-                      You keep the creator half of fees.
+                      You receive fees.
                     </span>
                   </button>
                   <button
@@ -682,7 +664,7 @@ export default function CreatePage() {
                   >
                     <span className="block text-xs font-bold text-neutral-900">Holder rewards</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
-                      Holders earn the fees, in ETH.
+                      Holders earn fees.
                     </span>
                   </button>
                 </div>
@@ -733,10 +715,7 @@ export default function CreatePage() {
                     </dl>
 
                     <p className="text-[10px] leading-relaxed text-neutral-600">
-                      Holders earn pro-rata against circulating supply — hold 1%, earn 1% of the
-                      holder share. Credit lands as each swap happens, so holders earn exactly the
-                      volume they held through, and keep it even if they sell before anyone
-                      harvests. Fixed at launch; it can never be changed afterwards.
+                      Fee settings are fixed after launch.
                     </p>
                   </div>
                 )}
@@ -754,14 +733,14 @@ export default function CreatePage() {
                   </span>
                   <div className="min-w-0 space-y-1.5">
                     <h4 className="text-xs font-semibold tracking-tight text-rose-900">
-                      Protected name
+                      Name unavailable
                     </h4>
                     <p className="text-[11px] leading-relaxed text-rose-700/80">
                       {nameBlocked ? "Name" : "Symbol"}{" "}
                       <span className="font-mono font-semibold text-rose-900">
                         {(nameBlocked ? name : symbol).trim()}
                       </span>{" "}
-                      matches a protected ancient runner. Choose an original.
+                      is protected. Choose another.
                     </p>
                   </div>
                 </div>
@@ -770,7 +749,7 @@ export default function CreatePage() {
               <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_28px_-22px_rgba(15,23,42,0.5)] backdrop-blur-xl">
                 <div className="flex items-center justify-between gap-3">
                   <h4 className="text-xs font-semibold tracking-tight text-neutral-800">
-                    Originality check
+                    Name check
                   </h4>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-100 px-2 py-1 text-[10px] font-semibold text-lime-800">
                     <span className="h-1.5 w-1.5 rounded-full bg-lime-500" />
@@ -778,7 +757,7 @@ export default function CreatePage() {
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
-                  Names and symbols are checked against protected ancient runners before launch.
+                  Names and symbols are checked before launch.
                 </p>
               </div>
             )}
@@ -786,12 +765,10 @@ export default function CreatePage() {
             {staleClient && (
               <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-amber-700">
-                  New version available
+                  Update required
                 </h4>
                 <p className="text-[11px] leading-relaxed text-neutral-400">
-                  The launchpad contract was upgraded since this page loaded. Launching from this
-                  tab would plant your token on the retired contract. Reload to launch on the
-                  current one — your form entries will be lost, so copy anything you need first.
+                  Reload before launching. Your form entries will be lost.
                 </p>
                 <button
                   type="button"
