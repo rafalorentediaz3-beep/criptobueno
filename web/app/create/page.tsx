@@ -536,7 +536,13 @@ export default function CreatePage() {
                     />
                   </label>
                 </div>
-                {uploadErr && <p className="text-xs text-rose-400">{uploadErr}</p>}
+                {uploadErr && (
+                  <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs leading-relaxed text-rose-700">
+                    {uploadErr.includes("PINATA_JWT")
+                      ? "Image uploads are not configured yet. Add PINATA_JWT to the server environment and try again."
+                      : uploadErr}
+                  </p>
+                )}
                 <p className="text-[11px] text-neutral-600">
                   PNG, JPG, GIF, WebP or SVG · up to 10 MB · animated GIFs play.
                 </p>

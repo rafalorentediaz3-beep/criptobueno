@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   if (!jwt) {
     return NextResponse.json(
       { error: "image upload not configured (PINATA_JWT missing)" },
-      { status: 501 },
+      { status: 503 },
     );
   }
 
