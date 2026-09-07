@@ -9,7 +9,8 @@ export type FeedbackAction =
   | "edit"
   | "admin"
   | "profile"
-  | "token-description";
+  | "token-description"
+  | "token-pairing";
 
 export const FEEDBACK_DOMAIN = "potato.fm";
 
@@ -47,6 +48,17 @@ export const DESCRIPTION_MAX = 500;
  */
 export function tokenDescriptionHash(p: { token: string; description: string }): string {
   return keccak256(toHex([p.token.toLowerCase(), p.description].join("\n")));
+}
+
+export function tokenPairingHash(p: {
+  token: string;
+  symbol: string;
+  name: string;
+  imageUrl: string;
+}): string {
+  return keccak256(
+    toHex([p.token.toLowerCase(), p.symbol.toUpperCase(), p.name, p.imageUrl].join("\n")),
+  );
 }
 
 /** The exact string the wallet signs. Client and server MUST produce it identically,

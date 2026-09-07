@@ -11,8 +11,10 @@ import { SITE_URL } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
 import { useAncientTokens } from "@/lib/ancient";
 import { DESCRIPTION_MAX, tokenDescriptionHash } from "@/lib/feedback/message";
+import { tokenPairingHash } from "@/lib/feedback/message";
 import { signAction } from "@/lib/feedback/sign";
 import { formatEth, normalizeSocialUrl, resolveImageUri, tryParseEther } from "@/lib/format";
+import type { RobinhoodStock } from "@/lib/stocks";
 import { ConnectGate } from "@/components/ConnectGate";
 import { NotDeployed } from "@/components/NotDeployed";
 import { TxStatus } from "@/components/TxStatus";
@@ -33,8 +35,28 @@ const CREATOR_HALF_PCT = 50;
 const MAX_CREATOR_CUT_PCT = CREATOR_HALF_PCT - 5;
 
 const inputCls =
-  "w-full rounded-lg border border-neutral-800 bg-black px-3 py-2.5 text-sm text-neutral-100 placeholder-neutral-700 outline-none transition-colors focus:border-neutral-600";
+  "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5";
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
+
+function StockLogo({ stock }: { stock: RobinhoodStock }) {
+  const initials = stock.symbol.slice(0, 2);
+  return (
+    <span className="relative h-9 w-9 shrink-0">
+      <img
+        src={stock.imageUrl}
+        alt=""
+        className="h-9 w-9 rounded-full border border-neutral-200 bg-white object-contain p-1"
+        onError={(event) => {
+          event.currentTarget.style.display = "none";
+          event.currentTarget.nextElementSibling?.removeAttribute("hidden");
+        }}
+      />
+      <span hidden className="absolute inset-0 flex items-center justify-center rounded-full bg-neutral-200 text-[10px] font-bold text-neutral-700">
+        {initials}
+      </span>
+    </span>
+  );
+}
 
 export default function CreatePage() {
   const router = useRouter();
@@ -94,6 +116,10 @@ export default function CreatePage() {
   // Object URL of the just-picked file: instant preview while IPFS propagates.
   const [localPreview, setLocalPreview] = useState<string | null>(null);
   const [uploadErr, setUploadErr] = useState("");
+  const [stocks, setStocks] = useState<RobinhoodStock[]>([]);
+  const [stockQuery, setStockQuery] = useState("");
+  const [pairedStock, setPairedStock] = useState<RobinhoodStock | null>(null);
+  const [stocksLoading, setStocksLoading] = useState(false);
 
   // Holder rewards: share the creator's half of the fees with everyone holding.
   const [rewardsOn, setRewardsOn] = useState(false);
@@ -101,6 +127,38 @@ export default function CreatePage() {
   const [staleClient, setStaleClient] = useState(false);
   const [creatorCutPct, setCreatorCutPct] = useState(0);
   const holderCutPct = CREATOR_HALF_PCT - creatorCutPct;
+
+  useEffect(() => {
+    let cancelled = false;
+    setStocksLoading(true);
+    const timer = setTimeout(() => {
+      fetch(`/api/robinhood/stocks${stockQuery.trim() ? `?search=${encodeURIComponent(stockQuery.trim())}` : ""}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("stock catalogue unavailable");
+        return (await response.json()) as { stocks?: RobinhoodStock[] };
+      })
+      .then((data) => {
+        if (!cancelled) setStocks(data.stocks ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setStocks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setStocksLoading(false);
+      });
+    }, stockQuery.trim() ? 350 : 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [stockQuery]);
+
+  const matchingStocks = useMemo(() => {
+    const query = stockQuery.trim().toLowerCase();
+    return stocks
+      .filter((stock) => !query || `${stock.symbol} ${stock.name}`.toLowerCase().includes(query))
+      .slice(0, 80);
+  }, [stockQuery, stocks]);
 
   async function handleUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -213,6 +271,41 @@ export default function CreatePage() {
         }
       })();
     }
+    if (launchedToken && pairedStock && userAddress) {
+      const tokenAddr = launchedToken;
+      void (async () => {
+        try {
+          const subject = tokenPairingHash({
+            token: tokenAddr,
+            symbol: pairedStock.symbol,
+            name: pairedStock.name,
+            imageUrl: pairedStock.imageUrl,
+          });
+          const { nonce, issuedAt, signature } = await signAction(
+            userAddress,
+            "token-pairing",
+            subject,
+            (message) => signMessageAsync({ message }),
+          );
+          await fetch("/api/token-pairing", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              address: userAddress,
+              token: tokenAddr,
+              symbol: pairedStock.symbol,
+              name: pairedStock.name,
+              imageUrl: pairedStock.imageUrl,
+              nonce,
+              issuedAt,
+              signature,
+            }),
+          });
+        } catch {
+          // Pairing is metadata only and never invalidates a successful launch.
+        }
+      })();
+    }
     // Kick the Discover/profile feed so "My profile" / planter pages pick up the
     // new plant sooner (server cache may still lag one TTL).
     void queryClient.invalidateQueries({ queryKey: ["launch-activity"] });
@@ -220,7 +313,7 @@ export default function CreatePage() {
     // navigate; the save continues even after the redirect either way.
     const timer = setTimeout(() => router.push(target), trimmedDesc ? 2500 : 800);
     return () => clearTimeout(timer);
-    // description/userAddress/signMessageAsync are read once at confirmation;
+    // description/pairing/userAddress/signMessageAsync are read once at confirmation;
     // intentionally not deps so a later keystroke can't re-fire the save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx.confirmed, tx.receipt, router, queryClient]);
@@ -300,9 +393,9 @@ export default function CreatePage() {
       <ConnectGate>
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           {/* LEFT: input matrix */}
-          <div className="space-y-5 rounded-xl border border-neutral-800/60 bg-neutral-950 p-5 sm:p-6 md:col-span-3">
+          <div className="space-y-5 rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_-35px_rgba(15,23,42,0.4)] sm:p-6 md:col-span-3">
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-neutral-100">Plant token</h1>
+              <h1 className="text-lg font-bold tracking-tight text-neutral-900">Launch a token</h1>
               <p className="mt-1 text-xs text-neutral-500">
                 Deploy a fixed-supply token straight into a permanently locked Uniswap V3 position.
               </p>
@@ -323,6 +416,64 @@ export default function CreatePage() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label htmlFor="paired-stock" className={labelCls}>
+                  Pair with a Robinhood stock
+                </label>
+                <p className="text-[11px] text-neutral-500">
+                  Choose an official active stock or ETF reference for your token. This does not
+                  create a stock position or change the Uniswap pool.
+                </p>
+                <input
+                  id="paired-stock"
+                  className={inputCls}
+                  placeholder="Search by ticker or company"
+                  value={stockQuery}
+                  onChange={(event) => setStockQuery(event.target.value)}
+                />
+                {pairedStock && (
+                  <button
+                    type="button"
+                    onClick={() => setPairedStock(null)}
+                    className="flex w-full items-center gap-3 rounded-xl border border-lime-300 bg-lime-50 p-3 text-left"
+                  >
+                    <StockLogo stock={pairedStock} />
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-sm text-neutral-900">{pairedStock.symbol}</strong>
+                      <span className="block truncate text-xs text-neutral-500">{pairedStock.name}</span>
+                    </span>
+                    <span className="text-xs text-neutral-500">Change</span>
+                  </button>
+                )}
+                {!pairedStock && (
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 p-1">
+                    {stocksLoading ? (
+                      <p className="p-4 text-center text-xs text-neutral-500">Loading Robinhood catalogue…</p>
+                    ) : matchingStocks.length === 0 ? (
+                      <p className="p-4 text-center text-xs text-neutral-500">No matching stocks found.</p>
+                    ) : (
+                      matchingStocks.map((stock) => (
+                        <button
+                          key={`${stock.symbol}-${stock.name}`}
+                          type="button"
+                          onClick={() => {
+                            setPairedStock(stock);
+                            setStockQuery("");
+                          }}
+                          className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-white"
+                        >
+                          <StockLogo stock={stock} />
+                          <span className="min-w-0">
+                            <strong className="block text-sm text-neutral-900">{stock.symbol}</strong>
+                            <span className="block truncate text-xs text-neutral-500">{stock.name}</span>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-1.5">
                 <label htmlFor="symbol" className={labelCls}>
                   Symbol / ticker
@@ -340,7 +491,7 @@ export default function CreatePage() {
               <div className="space-y-1.5">
                 <label className={labelCls}>Logo art</label>
                 <div className="flex gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-800 bg-black">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
                     {previewSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={previewSrc} alt="" className="h-full w-full object-cover" />
@@ -350,7 +501,7 @@ export default function CreatePage() {
                       <span className="text-neutral-700">—</span>
                     )}
                   </div>
-                  <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800">
+                  <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 transition-colors hover:bg-white">
                     {uploading ? "Uploading…" : "Upload image"}
                     <input
                       type="file"
@@ -463,7 +614,7 @@ export default function CreatePage() {
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-neutral-800/60 pt-4">
+              <div className="space-y-3 border-t border-neutral-200 pt-4">
                 <label className={labelCls}>Fee model</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -471,11 +622,11 @@ export default function CreatePage() {
                     onClick={() => setRewardsOn(false)}
                     className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                       rewardsOn
-                        ? "border-neutral-800 bg-black hover:border-neutral-700"
+                        ? "border-neutral-200 bg-white hover:border-neutral-300"
                         : "border-amber-500/60 bg-amber-500/10"
                     }`}
                   >
-                    <span className="block text-xs font-bold text-neutral-100">Standard</span>
+                    <span className="block text-xs font-bold text-neutral-900">Standard</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                       You keep the creator half of fees.
                     </span>
@@ -485,11 +636,11 @@ export default function CreatePage() {
                     onClick={() => setRewardsOn(true)}
                     className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                       rewardsOn
-                        ? "border-amber-500/60 bg-amber-500/10"
-                        : "border-neutral-800 bg-black hover:border-neutral-700"
+                        ? "border-lime-400 bg-lime-50"
+                        : "border-neutral-200 bg-white hover:border-neutral-300"
                     }`}
                   >
-                    <span className="block text-xs font-bold text-neutral-100">Holder rewards</span>
+                    <span className="block text-xs font-bold text-neutral-900">Holder rewards</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                       Holders earn the fees, in ETH.
                     </span>
@@ -497,7 +648,7 @@ export default function CreatePage() {
                 </div>
 
                 {rewardsOn && (
-                  <div className="space-y-3 rounded-lg border border-neutral-800/60 bg-black p-3.5">
+                  <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
                     <div className="flex items-baseline justify-between">
                       <label htmlFor="creatorcut" className={labelCls}>
                         Your cut
@@ -534,7 +685,7 @@ export default function CreatePage() {
                             <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                             {label}
                           </dt>
-                          <dd className="mt-0.5 font-mono text-xs tabular-nums text-neutral-200">
+                          <dd className="mt-0.5 font-mono text-xs tabular-nums text-neutral-900">
                             {pct}
                           </dd>
                         </div>
@@ -570,8 +721,8 @@ export default function CreatePage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-1.5 rounded-xl border border-neutral-800/60 bg-neutral-950 p-4">
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-neutral-400">
+              <div className="space-y-1.5 rounded-xl border border-neutral-200 bg-white p-4">
+                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-neutral-600">
                   Anti-vampire shield · active
                 </h4>
                 <p className="text-[11px] leading-relaxed text-neutral-500">
@@ -582,8 +733,8 @@ export default function CreatePage() {
             )}
 
             {staleClient && (
-              <div className="space-y-2 rounded-xl border border-amber-900/50 bg-amber-950/20 p-4">
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400">
+              <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-amber-700">
                   New version available
                 </h4>
                 <p className="text-[11px] leading-relaxed text-neutral-400">
@@ -607,7 +758,7 @@ export default function CreatePage() {
               className={`w-full rounded-xl py-3.5 text-xs font-bold uppercase tracking-widest transition-all ${
                 formValid && !tx.busy && !tx.confirmed && !staleClient
                   ? "bg-amber-500 text-neutral-950 hover:bg-amber-400"
-                  : "cursor-not-allowed border border-neutral-800 bg-neutral-900 text-neutral-600"
+                  : "cursor-not-allowed border border-neutral-200 bg-neutral-100 text-neutral-400"
               }`}
             >
               {submitLabel}
