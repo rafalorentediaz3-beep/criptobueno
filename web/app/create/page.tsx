@@ -39,13 +39,19 @@ const inputCls =
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
 
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
+  const [source, setSource] = useState(
+    `/stock-logos/${encodeURIComponent(stock.symbol)}.png`,
+  );
   return (
     <img
-      src={`/stock-logos/${encodeURIComponent(stock.symbol)}.png`}
+      src={source}
       alt={`${stock.name} logo`}
       loading="eager"
       decoding="async"
       className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-0"
+      onError={() => {
+        if (source !== stock.imageUrl) setSource(stock.imageUrl);
+      }}
     />
   );
 }

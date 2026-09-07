@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         type: item.type!,
         // Logos are checked into the app so the launch selector never depends
         // on a browser reaching a third-party CDN.
-        imageUrl: `/stock-logos/${encodeURIComponent(symbol)}.png`,
+        imageUrl: `/api/robinhood/logo?symbol=${encodeURIComponent(symbol)}&v=4`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))
