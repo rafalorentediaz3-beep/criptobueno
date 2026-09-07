@@ -49,7 +49,9 @@ function StockLogo({ stock }: { stock: RobinhoodStock }) {
       className="h-6 w-6 shrink-0 rounded-full object-contain p-0"
       onError={() => {
         const localFallback = `/stock-logos/${encodeURIComponent(stock.symbol)}.png`;
-        if (source !== localFallback) setSource(localFallback);
+        if (source !== localFallback) {
+          setSource(localFallback);
+        }
       }}
     />
   );

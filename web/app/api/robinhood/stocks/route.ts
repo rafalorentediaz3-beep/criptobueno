@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
         // on a browser reaching a third-party CDN.
         imageUrl:
           ORIGINAL_BRAND_LOGOS[symbol] ??
-          `/stock-logos/${encodeURIComponent(symbol)}.png`,
+          `/api/robinhood/logo?symbol=${encodeURIComponent(symbol)}&v=5`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))
