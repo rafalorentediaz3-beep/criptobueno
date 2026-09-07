@@ -39,9 +39,7 @@ const inputCls =
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
 
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
-  const [source, setSource] = useState(
-    `/stock-logos/${encodeURIComponent(stock.symbol)}.png`,
-  );
+  const [source, setSource] = useState(stock.imageUrl);
   return (
     <img
       src={source}
@@ -50,7 +48,8 @@ function StockLogo({ stock }: { stock: RobinhoodStock }) {
       decoding="async"
       className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-0"
       onError={() => {
-        if (source !== stock.imageUrl) setSource(stock.imageUrl);
+        const localFallback = `/stock-logos/${encodeURIComponent(stock.symbol)}.png`;
+        if (source !== localFallback) setSource(localFallback);
       }}
     />
   );
@@ -412,7 +411,7 @@ export default function CreatePage() {
                 <input
                   id="name"
                   className={`${inputCls} ${nameBlocked ? "border-rose-900/60 bg-rose-950/10 text-rose-300" : ""}`}
-                  placeholder="Mashed Potato"
+                  placeholder="Name"
                   value={name}
                   maxLength={48}
                   onChange={(e) => setName(e.target.value)}

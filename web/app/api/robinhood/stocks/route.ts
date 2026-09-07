@@ -13,6 +13,15 @@ type RobinhoodInstrument = {
   tradeable?: boolean;
 };
 
+const ORIGINAL_BRAND_LOGOS: Record<string, string> = {
+  ETH: "/stock-logos-original/ETH.svg",
+  NVDA: "/stock-logos-original/NVDA.svg",
+  SPCX: "/stock-logos-original/SPCX.svg",
+  GOOGL: "/stock-logos-original/GOOGL.svg",
+  TSLA: "/stock-logos-original/TSLA.svg",
+  AAPL: "/stock-logos-original/AAPL.svg",
+};
+
 export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get("search")?.trim().toLowerCase() ?? "";
   const instruments: RobinhoodInstrument[] = [];
@@ -47,12 +56,23 @@ export async function GET(req: NextRequest) {
         type: item.type!,
         // Logos are checked into the app so the launch selector never depends
         // on a browser reaching a third-party CDN.
-        imageUrl: `/api/robinhood/logo?symbol=${encodeURIComponent(symbol)}&v=4`,
+        imageUrl:
+          ORIGINAL_BRAND_LOGOS[symbol] ??
+          `/stock-logos/${encodeURIComponent(symbol)}.png`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))
     .sort((a, b) => a.symbol.localeCompare(b.symbol))
     .slice(0, 250);
+
+  if (!search || "eth ethereum ether".includes(search)) {
+    stocks.unshift({
+      symbol: "ETH",
+      name: "Ether",
+      type: "crypto",
+      imageUrl: ORIGINAL_BRAND_LOGOS.ETH,
+    });
+  }
 
   return NextResponse.json(
     { stocks },
