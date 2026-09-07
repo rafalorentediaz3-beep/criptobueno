@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { bytesToHex, decodeEventLog } from "viem";
 import { useAccount, useReadContracts, useSignMessage } from "wagmi";
 import { potatoCurvePadAbi } from "@/lib/abi";
@@ -147,7 +147,22 @@ export default function CreatePage() {
   // True when the server reports a newer pad than this bundle was built with.
   const [staleClient, setStaleClient] = useState(false);
   const [creatorCutPct, setCreatorCutPct] = useState(0);
+  const [launchWarning, setLaunchWarning] = useState("");
+  const launchWarningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holderCutPct = CREATOR_HALF_PCT - creatorCutPct;
+
+  function showLaunchWarning(message: string) {
+    if (launchWarningTimer.current) clearTimeout(launchWarningTimer.current);
+    setLaunchWarning("");
+    requestAnimationFrame(() => setLaunchWarning(message));
+    launchWarningTimer.current = setTimeout(() => setLaunchWarning(""), 4200);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (launchWarningTimer.current) clearTimeout(launchWarningTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -338,7 +353,24 @@ export default function CreatePage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!formValid || devBuyWei === undefined) return;
+    if (!formValid || devBuyWei === undefined) {
+      if (vampBlocked) {
+        showLaunchWarning("Choose another name or symbol before launching.");
+      } else if (!name.trim() || !symbol.trim()) {
+        showLaunchWarning("Add a name and symbol before launching.");
+      } else if (!image.trim()) {
+        showLaunchWarning("Add a token image before launching.");
+      } else if (devBuyWei === undefined || devBuyTooLarge) {
+        showLaunchWarning("Adjust the dev buy amount before launching.");
+      } else {
+        showLaunchWarning("Complete the required fields before launching.");
+      }
+      return;
+    }
+    if (staleClient) {
+      showLaunchWarning("Reload the page before launching this token.");
+      return;
+    }
     // Stale-client guard. The pad address is baked into this bundle at build
     // time; a tab left open across a repoint keeps writing to the RETIRED pad
     // (that is exactly how DeepFryer/FROG/POND launched onto the old
@@ -404,6 +436,15 @@ export default function CreatePage() {
 
   return (
     <div className="mx-auto max-w-4xl">
+      {launchWarning && (
+        <div
+          key={launchWarning}
+          role="alert"
+          className="launch-warning fixed left-1/2 top-4 z-[100] w-[min(92vw,28rem)] -translate-x-1/2 rounded-2xl border border-amber-300/80 bg-[#fff8df]/95 px-4 py-3 text-center text-sm font-semibold text-[#765514] shadow-[0_18px_45px_-18px_rgba(120,85,10,0.55)] backdrop-blur-xl"
+        >
+          {launchWarning}
+        </div>
+      )}
       <ConnectGate>
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           {/* LEFT: input matrix */}
@@ -724,7 +765,7 @@ export default function CreatePage() {
           </div>
 
           {/* RIGHT: shield + submit */}
-          <div className="space-y-4 md:col-span-2 md:sticky md:top-24">
+          <div className="flex flex-col gap-4 md:col-span-2 md:sticky md:top-24 md:min-h-[640px]">
             {vampBlocked ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_28px_-22px_rgba(225,29,72,0.55)] backdrop-blur-xl">
                 <div className="flex items-start gap-3">
@@ -773,28 +814,26 @@ export default function CreatePage() {
                 </button>
               </div>
             )}
-            <div
-              className={
-                formValid && !tx.busy && !tx.confirmed && !staleClient
-                  ? "launch-cta-border"
-                  : "rounded-2xl border border-white/80 bg-white/60 p-px backdrop-blur-xl"
-              }
-            >
-              <button
-                type="submit"
-                form="launch-form"
-                disabled={!formValid || tx.busy || tx.confirmed || staleClient}
-                className={`w-full py-5 text-sm font-semibold tracking-wide transition-all ${
-                  formValid && !tx.busy && !tx.confirmed && !staleClient
-                    ? "bg-[#d4a72c] text-[#271b05] shadow-[inset_0_1px_0_rgba(255,243,163,0.7),0_12px_24px_-14px_rgba(146,101,5,0.8)] hover:bg-[#e0b83c]"
-                    : "cursor-not-allowed rounded-[calc(1rem-1px)] bg-white/60 text-neutral-400"
-                }`}
-              >
-                {submitLabel}
-              </button>
-            </div>
+            <div className="flex flex-1 items-center justify-center">
+              <div className="w-full">
+                <div className="launch-cta-border">
+                  <button
+                    type="submit"
+                    form="launch-form"
+                    disabled={tx.busy || tx.confirmed}
+                    className={`w-full py-5 text-sm font-semibold tracking-wide transition-all ${
+                      formValid && !tx.busy && !tx.confirmed && !staleClient
+                        ? "bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] text-[#3a2100] shadow-[inset_0_2px_0_rgba(255,255,218,0.9),inset_0_-3px_0_rgba(142,78,0,0.25),0_12px_24px_-12px_rgba(180,108,0,0.95)] hover:brightness-110"
+                        : "cursor-pointer bg-[linear-gradient(180deg,#e9c54b_0%,#c99a20_100%)] text-[#634000] shadow-[inset_0_1px_0_rgba(255,246,170,0.7)] hover:brightness-105"
+                    }`}
+                  >
+                    {submitLabel}
+                  </button>
+                </div>
 
-            <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
+                <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
+              </div>
+            </div>
           </div>
         </div>
       </ConnectGate>

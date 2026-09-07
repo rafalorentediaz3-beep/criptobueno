@@ -47,7 +47,10 @@
       overflow: hidden;
       border-radius: 1rem;
       padding: 1px;
-      background: #d4a72c;
+      background: #f6bd18;
+      box-shadow:
+        0 0 0 1px rgba(157, 88, 0, 0.2),
+        0 10px 28px -14px rgba(211, 132, 0, 0.95);
     }
 
     .launch-cta-border::before {
@@ -57,8 +60,9 @@
       background: conic-gradient(
         from 0deg,
         transparent 0deg 300deg,
-        #fff3a3 324deg,
-        #b77908 344deg,
+        #fffbd0 316deg,
+        #fff06a 330deg,
+        #d77b00 347deg,
         transparent 360deg
       );
       content: "";
@@ -78,8 +82,31 @@
     }
   }
 
+  .launch-warning {
+    animation: launch-warning-in-out 4.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes launch-warning-in-out {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -140%);
+    }
+    16%,
+    78% {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -140%);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .launch-cta-border::before {
+      animation: none;
+    }
+    .launch-warning {
       animation: none;
     }
   }
