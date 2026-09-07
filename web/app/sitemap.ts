@@ -1,18 +1,35 @@
-export const dynamic = "force-static";
+import type { MetadataRoute } from "next";
 
-export async function GET() {
-  const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-</urlset>`;
+const BASE = "https://potato.fm";
 
-  return new Response(body, {
-    headers: {
-      "Content-Type": "application/xml",
+export const revalidate = 3600;
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  return [
+    {
+      url: BASE,
+      changeFrequency: "daily",
+      priority: 1,
     },
-  });
-}
-    /* feed unavailable — static routes still ship */
-  }
-
-  return [...staticRoutes, ...tokens];
+    {
+      url: `${BASE}/create`,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE}/analytics`,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE}/terms`,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE}/privacy`,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+  ];
 }
