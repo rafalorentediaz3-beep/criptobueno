@@ -46,7 +46,7 @@ function StockLogo({ stock }: { stock: RobinhoodStock }) {
       alt={`${stock.name} logo`}
       loading="eager"
       decoding="async"
-      className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-0"
+      className="h-6 w-6 shrink-0 rounded-full object-contain p-0"
       onError={() => {
         const localFallback = `/stock-logos/${encodeURIComponent(stock.symbol)}.png`;
         if (source !== localFallback) setSource(localFallback);
@@ -462,7 +462,7 @@ export default function CreatePage() {
                             setPairedStock(stock);
                             setStockQuery("");
                           }}
-                          className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-white"
+                          className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white"
                         >
                           <StockLogo stock={stock} />
                           <span className="min-w-0">
