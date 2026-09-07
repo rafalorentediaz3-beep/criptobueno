@@ -45,9 +45,10 @@ export async function GET(req: NextRequest) {
         symbol,
         name: item.simple_name || item.name!,
         type: item.type!,
-        // Robinhood supplies the canonical symbol/name catalogue; IEX's public
-        // symbol logo CDN supplies the visual mark with initials as a fallback.
-        imageUrl: `https://storage.googleapis.com/iex/api/logos/${encodeURIComponent(symbol)}.png`,
+        // Robinhood supplies the canonical symbol/name catalogue. This public
+        // company-logo CDN covers the major listed stocks and the UI supplies
+        // a deterministic ticker fallback for symbols without an image.
+        imageUrl: `https://companiesmarketcap.com/img/company-logos/64/${encodeURIComponent(symbol)}.png`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))
