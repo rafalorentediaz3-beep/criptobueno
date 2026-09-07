@@ -268,7 +268,8 @@ export default function DiscoverPage() {
     ? (ancientLoading || ancientUnavailable) && ancientTokens.length === 0
     : (launchLoading || launchUnavailable) && creations.length === 0;
 
-  const segBase = "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors";
+  const segBase =
+    "rounded-full px-3.5 py-2 text-xs font-semibold tracking-tight transition-all";
 
   return (
     <div className="space-y-6">
@@ -286,8 +287,8 @@ export default function DiscoverPage() {
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1 rounded-full bg-neutral-100 p-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 rounded-full border border-white/80 bg-white/60 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] backdrop-blur-xl">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -295,8 +296,8 @@ export default function DiscoverPage() {
                 onClick={() => setTab(t.id)}
                 className={`${segBase} ${
                   tab === t.id
-                    ? "bg-white text-neutral-900 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
+                    ? "bg-neutral-900 text-white shadow-[0_5px_14px_-8px_rgba(15,23,42,0.8)]"
+                    : "text-neutral-500 hover:bg-white/80 hover:text-neutral-900"
                 }`}
               >
                 {t.label}
@@ -305,14 +306,14 @@ export default function DiscoverPage() {
           </div>
 
           {!isAncientTab && (
-            <div className="flex gap-1 rounded-full bg-neutral-100 p-1 font-mono">
+            <div className="flex flex-wrap gap-1 rounded-full border border-white/80 bg-white/60 p-1.5 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] backdrop-blur-xl">
               {SORTS.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => setSort(s.id)}
-                  className={`rounded-full px-3 py-2 text-[11px] transition-colors ${
-                    sort === s.id ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500 hover:text-neutral-900"
+                  className={`rounded-full px-3.5 py-2 text-[11px] transition-all ${
+                  sort === s.id ? "bg-lime-100 text-lime-900 shadow-sm ring-1 ring-lime-200" : "text-neutral-500 hover:bg-white/80 hover:text-neutral-900"
                   }`}
                 >
                   {s.id === "recent" && (
