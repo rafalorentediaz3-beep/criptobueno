@@ -648,7 +648,7 @@ export default function CreatePage() {
                         : "border-amber-500/60 bg-amber-500/10"
                     }`}
                   >
-                    <span className="block text-xs font-bold text-neutral-900">Standard</span>
+                    <span className="block text-xs font-bold text-neutral-900">Dev fees</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                       You receive fees.
                     </span>
