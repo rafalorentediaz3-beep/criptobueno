@@ -18,7 +18,6 @@ const ROBINHOOD_V4 = {
   weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
 };
 
-const DEFAULT_TREASURY = "0xd3358b1F39A6a71911c6e33717D185F99d43e80d";
 const BANNED = [
   "CASHCAT", "Cash Cat", "TENDIES", "JUGGERNAUT", "The Juggernaut", "FOX",
   "Robin Hood", "WISHBONE", "STONKS", "DFV", "DeepFuckingValue", "meow", "GME", "GameStop",
@@ -29,10 +28,25 @@ async function main() {
     throw new Error("deploy-v4.ts is intentionally restricted to Robinhood mainnet");
   }
   const [deployer] = await ethers.getSigners();
-  const treasury = process.env.TREASURY || DEFAULT_TREASURY;
-  const owner = process.env.OWNER || treasury;
+  // Safe default for a first deployment: the signer owns the pad and receives
+  // its treasury share. Override either value explicitly for a multisig or DAO.
+  const treasury = process.env.TREASURY || deployer.address;
+  const owner = process.env.OWNER || deployer.address;
   const startFdv = ethers.parseEther(process.env.START_FDV_ETH || "3");
   const antiSnipeBlocks = BigInt(process.env.ANTI_SNIPE_BLOCKS || "1200");
+  const balance = await ethers.provider.getBalance(deployer.address);
+
+  console.log(`network:  ${network.name}`);
+  console.log(`signer:   ${deployer.address}`);
+  console.log(`balance:  ${ethers.formatEther(balance)} ETH`);
+  console.log(`treasury: ${treasury}`);
+  console.log(`owner:    ${owner}`);
+  console.log(`start FDV: ${ethers.formatEther(startFdv)} ETH`);
+  console.log(`anti-snipe: ${antiSnipeBlocks} blocks`);
+
+  if (balance === 0n) {
+    throw new Error("The deployer has no ETH on Robinhood Chain.");
+  }
 
   const pad = await (
     await ethers.getContractFactory("PotatoV4Pad")
