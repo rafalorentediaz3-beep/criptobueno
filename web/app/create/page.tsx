@@ -407,37 +407,54 @@ export default function CreatePage() {
       <ConnectGate>
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           {/* LEFT: input matrix */}
-          <div className="space-y-5 rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_18px_50px_-35px_rgba(15,23,42,0.4)] sm:p-6 md:col-span-3">
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-neutral-900">Launch a token</h1>
-              <p className="mt-1 text-xs text-neutral-500">
-                Deploy a fixed-supply token straight into a permanently locked Uniswap V3 position.
+          <div className="space-y-6 rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_20px_55px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl sm:p-7 md:col-span-3">
+            <div className="border-b border-neutral-100 pb-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-lime-700">
+                Create
+              </p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
+                Launch a token
+              </h1>
+              <p className="mt-1.5 text-sm text-neutral-500">
+                Set the basics, add an optional image, and launch.
               </p>
             </div>
 
-            <form id="launch-form" onSubmit={onSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label htmlFor="name" className={labelCls}>
-                  Token name
-                </label>
-                <input
-                  id="name"
-                  className={`${inputCls} ${nameBlocked ? "border-rose-900/60 bg-rose-950/10 text-rose-300" : ""}`}
-                  placeholder="Name"
-                  value={name}
-                  maxLength={48}
-                  onChange={(e) => setName(e.target.value)}
-                />
+            <form id="launch-form" onSubmit={onSubmit} className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-[1.35fr_0.65fr]">
+                <div className="space-y-1.5">
+                  <label htmlFor="name" className={labelCls}>
+                    Token name
+                  </label>
+                  <input
+                    id="name"
+                    className={`${inputCls} ${nameBlocked ? "border-rose-900/60 bg-rose-950/10 text-rose-300" : ""}`}
+                    placeholder="e.g. Moon Club"
+                    value={name}
+                    maxLength={48}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="symbol" className={labelCls}>
+                    Ticker
+                  </label>
+                  <input
+                    id="symbol"
+                    className={`${inputCls} font-mono uppercase ${symbolBlocked ? "border-rose-900/60 bg-rose-950/10 text-rose-300" : ""}`}
+                    placeholder="MASH"
+                    value={symbol}
+                    maxLength={12}
+                    onChange={(e) => setSymbol(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="paired-stock" className={labelCls}>
                   Pair with a Robinhood stock
                 </label>
-                <p className="text-[11px] text-neutral-500">
-                  Choose an official active stock or ETF reference for your token. This does not
-                  create a stock position or change the Uniswap pool.
-                </p>
+                <p className="text-[11px] text-neutral-500">Optional reference. It does not create a stock position.</p>
                 <input
                   id="paired-stock"
                   className={`${inputCls} border-white/80 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(15,23,42,0.45)] backdrop-blur-xl`}
@@ -499,23 +516,12 @@ export default function CreatePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="symbol" className={labelCls}>
-                  Symbol / ticker
-                </label>
-                <input
-                  id="symbol"
-                  className={`${inputCls} font-mono uppercase ${symbolBlocked ? "border-rose-900/60 bg-rose-950/10 text-rose-300" : ""}`}
-                  placeholder="MASH"
-                  value={symbol}
-                  maxLength={12}
-                  onChange={(e) => setSymbol(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className={labelCls}>Logo art</label>
+                <div className="flex items-center justify-between">
+                  <label className={labelCls}>Logo</label>
+                  <span className="text-[10px] text-neutral-400">Optional</span>
+                </div>
                 <div className="flex gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/80 bg-neutral-50 shadow-sm">
                     {previewSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={previewSrc} alt="" className="h-full w-full object-cover" />
@@ -525,7 +531,7 @@ export default function CreatePage() {
                       <span className="text-neutral-700">—</span>
                     )}
                   </div>
-                  <label className="flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 transition-colors hover:bg-white">
+                  <label className="flex flex-1 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/55 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-white">
                     {uploading ? "Uploading…" : "Upload image"}
                     <input
                       type="file"
@@ -543,12 +549,15 @@ export default function CreatePage() {
                       : uploadErr}
                   </p>
                 )}
-                <p className="text-[11px] text-neutral-600">
-                  PNG, JPG, GIF, WebP or SVG · up to 10 MB · animated GIFs play.
-                </p>
+                <p className="text-[10px] text-neutral-400">PNG, JPG, GIF, WebP or SVG · max 10 MB.</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={labelCls}>Links</span>
+                  <span className="text-[10px] text-neutral-400">Optional</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="twitter" className={labelCls}>
                     X / Twitter
@@ -574,6 +583,7 @@ export default function CreatePage() {
                   />
                 </div>
               </div>
+              </div>
 
               <div className="space-y-1.5">
                 <label htmlFor="website" className={labelCls}>
@@ -586,8 +596,8 @@ export default function CreatePage() {
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                 />
-                <p className="text-[9px] text-neutral-600">
-                  Leave blank and your coin links to {SITE_URL.replace(/^https?:\/\//, "")}.
+                <p className="text-[10px] text-neutral-400">
+                  Leave blank to use {SITE_URL.replace(/^https?:\/\//, "")}.
                 </p>
               </div>
 
@@ -609,13 +619,10 @@ export default function CreatePage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
-                <p className="text-[9px] text-neutral-600">
-                  Shown on your coin&apos;s page. You&apos;ll sign a free message after launch to
-                  save it (no gas).
-                </p>
+                <p className="text-[10px] text-neutral-400">Shown on your token page. Saved after launch.</p>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="devbuy" className={labelCls}>
                     Initial dev buy (ETH)
@@ -644,8 +651,11 @@ export default function CreatePage() {
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-neutral-200 pt-4">
-                <label className={labelCls}>Fee model</label>
+              <div className="space-y-3 border-t border-neutral-100 pt-5">
+                <div>
+                  <label className={labelCls}>Fee model</label>
+                  <p className="mt-1 text-[11px] text-neutral-400">Choose how the creator share is distributed.</p>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
