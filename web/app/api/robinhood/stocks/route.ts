@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         // Robinhood supplies the canonical symbol/name catalogue. FMP's public
         // symbol endpoint provides the issuer logo, including many OTC symbols
         // that do not exist in the large-cap logo catalogues.
-        imageUrl: `https://financialmodelingprep.com/image-stock/${encodeURIComponent(symbol)}.png`,
+        imageUrl: `/api/robinhood/logo?symbol=${encodeURIComponent(symbol)}`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))
