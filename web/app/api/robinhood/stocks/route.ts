@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
         // Robinhood supplies the canonical symbol/name catalogue. FMP's public
         // symbol endpoint provides the issuer logo, including many OTC symbols
         // that do not exist in the large-cap logo catalogues.
-        imageUrl: `/api/robinhood/logo?symbol=${encodeURIComponent(symbol)}`,
+        // Version the URL so browsers discard the old failed external-logo
+        // response that was cached before the same-origin proxy was added.
+        imageUrl: `/api/robinhood/logo?symbol=${encodeURIComponent(symbol)}&v=2`,
       };
     })
     .filter((item) => !search || `${item.symbol} ${item.name}`.toLowerCase().includes(search))

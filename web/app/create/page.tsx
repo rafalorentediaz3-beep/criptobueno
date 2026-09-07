@@ -44,7 +44,8 @@ function StockLogo({ stock }: { stock: RobinhoodStock }) {
     <span className="relative h-9 w-9 shrink-0">
       <img
         src={stock.imageUrl}
-        alt=""
+        alt={`${stock.name} logo`}
+        loading="lazy"
         className="h-9 w-9 rounded-full border border-neutral-200 bg-white object-contain p-1"
         onError={(event) => {
           event.currentTarget.style.display = "none";
