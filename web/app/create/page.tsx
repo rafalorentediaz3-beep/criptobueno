@@ -746,17 +746,11 @@ export default function CreatePage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_28px_-22px_rgba(15,23,42,0.5)] backdrop-blur-xl">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-xs font-semibold tracking-tight text-neutral-800">
-                    Name check
-                  </h4>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-100 px-2 py-1 text-[10px] font-semibold text-lime-800">
-                    <span className="h-1.5 w-1.5 rounded-full bg-lime-500" />
-                    Active
-                  </span>
-                </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+              <div className="rounded-3xl border border-white/80 bg-white/65 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_40px_-24px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+                <h4 className="text-base font-semibold tracking-tight text-neutral-900">
+                  Name check
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-neutral-500">
                   Names and symbols are checked before launch.
                 </p>
               </div>
@@ -779,18 +773,26 @@ export default function CreatePage() {
                 </button>
               </div>
             )}
-            <button
-              type="submit"
-              form="launch-form"
-              disabled={!formValid || tx.busy || tx.confirmed || staleClient}
-              className={`w-full rounded-2xl py-3.5 text-xs font-semibold tracking-wide transition-all ${
+            <div
+              className={
                 formValid && !tx.busy && !tx.confirmed && !staleClient
-                  ? "bg-neutral-900 text-white shadow-[0_12px_24px_-14px_rgba(15,23,42,0.8)] hover:-translate-y-0.5 hover:bg-neutral-800"
-                  : "cursor-not-allowed border border-white/80 bg-white/60 text-neutral-400 backdrop-blur-xl"
-              }`}
+                  ? "launch-cta-border"
+                  : "rounded-2xl border border-white/80 bg-white/60 p-px backdrop-blur-xl"
+              }
             >
-              {submitLabel}
-            </button>
+              <button
+                type="submit"
+                form="launch-form"
+                disabled={!formValid || tx.busy || tx.confirmed || staleClient}
+                className={`w-full py-5 text-sm font-semibold tracking-wide transition-all ${
+                  formValid && !tx.busy && !tx.confirmed && !staleClient
+                    ? "bg-[#d4a72c] text-[#271b05] shadow-[inset_0_1px_0_rgba(255,243,163,0.7),0_12px_24px_-14px_rgba(146,101,5,0.8)] hover:bg-[#e0b83c]"
+                    : "cursor-not-allowed rounded-[calc(1rem-1px)] bg-white/60 text-neutral-400"
+                }`}
+              >
+                {submitLabel}
+              </button>
+            </div>
 
             <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
           </div>

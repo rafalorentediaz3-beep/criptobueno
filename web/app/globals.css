@@ -40,7 +40,49 @@
   .skeleton {
     @apply animate-pulse rounded-lg bg-neutral-200;
   }
-}
+
+    .launch-cta-border {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      border-radius: 1rem;
+      padding: 1px;
+      background: #d4a72c;
+    }
+
+    .launch-cta-border::before {
+      position: absolute;
+      inset: -70%;
+      z-index: -1;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg 300deg,
+        #fff3a3 324deg,
+        #b77908 344deg,
+        transparent 360deg
+      );
+      content: "";
+      animation: launch-border-spin 2.8s linear infinite;
+    }
+
+    .launch-cta-border > button {
+      position: relative;
+      z-index: 1;
+      border-radius: calc(1rem - 1px);
+    }
+  }
+
+  @keyframes launch-border-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .launch-cta-border::before {
+      animation: none;
+    }
+  }
 
 /* Ticker-strip marquee: content is rendered twice, shift by exactly half. */
 @keyframes marquee {
