@@ -26,11 +26,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/70 bg-white/65 shadow-[0_8px_30px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center gap-5 px-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <img src="/logo.webp" alt="PotatoPad" className="h-10 w-10 rounded-xl object-cover ring-1 ring-neutral-200" />
-          <span className="hidden text-base font-semibold tracking-tight text-neutral-900 sm:block">
-            Potato<span className="text-neutral-400">Pad</span>
-          </span>
+        <Link href="/" className="flex min-w-0 shrink-0 items-center">
+          <img
+            src="/nofight-logo.png"
+            alt="nofight.fun"
+            className="h-14 w-auto max-w-[240px] object-contain sm:h-16 sm:max-w-[280px]"
+          />
         </Link>
 
         <nav className="hidden items-center gap-1 rounded-full border border-white/80 bg-white/55 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-xl md:flex">
@@ -43,16 +44,6 @@ export function Header() {
             }`}
           >
             Explore
-          </Link>
-          <Link
-            href="/feedback"
-            className={`rounded-full px-4 py-2 text-sm transition-colors ${
-              pathname === "/feedback"
-                ? "bg-white font-medium text-neutral-900 shadow-sm"
-                : "text-neutral-500 hover:text-neutral-900"
-            }`}
-          >
-            Forum
           </Link>
           <Link href="/analytics" className={`rounded-full px-4 py-2 text-sm transition-colors ${
             pathname.startsWith("/analytics")
