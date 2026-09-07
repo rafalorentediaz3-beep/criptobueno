@@ -23,7 +23,6 @@ import { EditProfileModal } from "@/components/EditProfileModal";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useProfile } from "@/lib/profile/useProfile";
 import { TokenCard, type TokenRow } from "@/components/TokenCard";
-import { TokenCardSkeleton } from "@/components/Skeletons";
 
 const PAGE_SIZE = 50;
 
@@ -227,33 +226,6 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
     );
   }
 
-  if (isLoading && allCreations.length === 0 && feedState !== "stale" && !feedTimedOut) {
-    return (
-      <div>
-        <div className="card mb-6 h-28 animate-pulse bg-white/60" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <TokenCardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (feedState === "unavailable" && allCreations.length === 0 && !feedTimedOut) {
-    return (
-      <div className="mx-auto max-w-lg rounded-3xl border border-white/80 bg-white/65 p-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_40px_-28px_rgba(15,23,42,0.5)] backdrop-blur-xl">
-        <h2 className="text-lg font-bold text-neutral-900">Creator activity unavailable</h2>
-        <p className="mt-2 text-sm text-neutral-500">
-          The launch feed could not be loaded. Try again in a moment.
-        </p>
-        <Link href="/" className="btn-secondary mt-5 inline-flex">
-          Back to Discover
-        </Link>
-      </div>
-    );
-  }
-
   // Personal profiles belong to EVERY wallet, so a wallet with no plants still gets
   // the full profile chrome (picture, name, bio, Edit). Only the COIN LIST is replaced
   // by this empty state, which renders below the header instead of replacing the page —
@@ -263,7 +235,17 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
   const emptyState =
     mine.length === 0 ? (
       <div className="mx-auto max-w-lg rounded-3xl border border-white/80 bg-white/65 p-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_40px_-28px_rgba(15,23,42,0.5)] backdrop-blur-xl">
-        {isYou ? (
+        {isLoading && !feedTimedOut && feedState !== "stale" ? (
+          <>
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900" />
+            <h2 className="mt-4 text-lg font-bold text-neutral-900">
+              Loading launch activity
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              Your profile is ready. We&apos;re checking Robinhood Chain for launches.
+            </p>
+          </>
+        ) : isYou ? (
           <>
             <Sprout className="mx-auto h-10 w-10 text-amber-500/80" aria-hidden />
             <h2 className="mt-4 text-lg font-bold text-neutral-900">
