@@ -39,25 +39,14 @@ const inputCls =
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
 
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
-  const initials = stock.symbol.slice(0, 2);
-  const [failed, setFailed] = useState(false);
   return (
-    <span className="relative h-9 w-9 shrink-0">
-      {failed ? (
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-bold text-neutral-700">
-          {initials}
-        </span>
-      ) : (
-        <img
-          src={`/stock-logos/${encodeURIComponent(stock.symbol)}.png`}
-          alt={`${stock.name} logo`}
-          loading="eager"
-          decoding="async"
-          className="h-9 w-9 rounded-full border border-neutral-200 bg-white object-contain p-1"
-          onError={() => setFailed(true)}
-        />
-      )}
-    </span>
+    <img
+      src={`/stock-logos/${encodeURIComponent(stock.symbol)}.png`}
+      alt={`${stock.name} logo`}
+      loading="eager"
+      decoding="async"
+      className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-0"
+    />
   );
 }
 
