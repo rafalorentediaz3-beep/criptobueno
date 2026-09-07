@@ -731,27 +731,38 @@ export default function CreatePage() {
           {/* RIGHT: shield + submit */}
           <div className="space-y-4 md:col-span-2 md:sticky md:top-24">
             {vampBlocked ? (
-              <div className="space-y-1.5 rounded-xl border border-rose-900/40 bg-rose-950/10 p-4">
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-rose-400">
-                  Anti-vampire shield · blocked
-                </h4>
-                <p className="text-[11px] leading-relaxed text-rose-300/80">
-                  {nameBlocked ? "Name" : "Symbol"}{" "}
-                  <span className="font-mono font-bold text-white">
-                    {(nameBlocked ? name : symbol).trim()}
-                  </span>{" "}
-                  matches a protected ancient runner. Duplicate launches are rejected on-chain — pick
-                  an original.
-                </p>
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_28px_-22px_rgba(225,29,72,0.55)] backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs text-rose-600">
+                    !
+                  </span>
+                  <div className="min-w-0 space-y-1.5">
+                    <h4 className="text-xs font-semibold tracking-tight text-rose-900">
+                      Protected name
+                    </h4>
+                    <p className="text-[11px] leading-relaxed text-rose-700/80">
+                      {nameBlocked ? "Name" : "Symbol"}{" "}
+                      <span className="font-mono font-semibold text-rose-900">
+                        {(nameBlocked ? name : symbol).trim()}
+                      </span>{" "}
+                      matches a protected ancient runner. Choose an original.
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="space-y-1.5 rounded-xl border border-neutral-200 bg-white p-4">
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-neutral-600">
-                  Anti-vampire shield · active
-                </h4>
-                <p className="text-[11px] leading-relaxed text-neutral-500">
-                  Names and symbols are checked against curated ancient runners, on-chain and in this
-                  form, so copycats can&apos;t vamp the originals.
+              <div className="rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_28px_-22px_rgba(15,23,42,0.5)] backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-xs font-semibold tracking-tight text-neutral-800">
+                    Originality check
+                  </h4>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-lime-100 px-2 py-1 text-[10px] font-semibold text-lime-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-lime-500" />
+                    Active
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+                  Names and symbols are checked against protected ancient runners before launch.
                 </p>
               </div>
             )}
@@ -779,10 +790,10 @@ export default function CreatePage() {
               type="submit"
               form="launch-form"
               disabled={!formValid || tx.busy || tx.confirmed || staleClient}
-              className={`w-full rounded-xl py-3.5 text-xs font-bold uppercase tracking-widest transition-all ${
+              className={`w-full rounded-2xl py-3.5 text-xs font-semibold tracking-wide transition-all ${
                 formValid && !tx.busy && !tx.confirmed && !staleClient
-                  ? "bg-amber-500 text-neutral-950 hover:bg-amber-400"
-                  : "cursor-not-allowed border border-neutral-200 bg-neutral-100 text-neutral-400"
+                  ? "bg-neutral-900 text-white shadow-[0_12px_24px_-14px_rgba(15,23,42,0.8)] hover:-translate-y-0.5 hover:bg-neutral-800"
+                  : "cursor-not-allowed border border-white/80 bg-white/60 text-neutral-400 backdrop-blur-xl"
               }`}
             >
               {submitLabel}
