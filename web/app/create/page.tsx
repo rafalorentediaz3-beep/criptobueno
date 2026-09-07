@@ -40,31 +40,23 @@ const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-50
 
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
   const initials = stock.symbol.slice(0, 2);
-  const [sourceIndex, setSourceIndex] = useState(0);
-  const sources = [
-    stock.imageUrl,
-    `https://financialmodelingprep.com/image-stock/${encodeURIComponent(stock.symbol)}.png`,
-    `https://companiesmarketcap.com/img/company-logos/64/${encodeURIComponent(stock.symbol)}.png`,
-  ];
+  const [failed, setFailed] = useState(false);
   return (
     <span className="relative h-9 w-9 shrink-0">
-      <img
-        src={sources[sourceIndex]}
-        alt={`${stock.name} logo`}
-        loading="lazy"
-        className="h-9 w-9 rounded-full border border-neutral-200 bg-white object-contain p-1"
-        onError={(event) => {
-          if (sourceIndex < sources.length - 1) {
-            setSourceIndex((index) => index + 1);
-          } else {
-            event.currentTarget.style.display = "none";
-            event.currentTarget.nextElementSibling?.removeAttribute("hidden");
-          }
-        }}
-      />
-      <span hidden className="absolute inset-0 flex items-center justify-center rounded-full bg-neutral-200 text-[10px] font-bold text-neutral-700">
-        {initials}
-      </span>
+      {failed ? (
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-bold text-neutral-700">
+          {initials}
+        </span>
+      ) : (
+        <img
+          src={`/stock-logos/${encodeURIComponent(stock.symbol)}.png`}
+          alt={`${stock.name} logo`}
+          loading="eager"
+          decoding="async"
+          className="h-9 w-9 rounded-full border border-neutral-200 bg-white object-contain p-1"
+          onError={() => setFailed(true)}
+        />
+      )}
     </span>
   );
 }
