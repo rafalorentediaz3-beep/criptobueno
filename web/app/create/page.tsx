@@ -38,6 +38,28 @@ const inputCls =
   "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5";
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
 
+let stockCatalogueCache: RobinhoodStock[] | null = null;
+let stockCatalogueRequest: Promise<RobinhoodStock[]> | null = null;
+
+function loadStockCatalogue() {
+  if (stockCatalogueCache) return Promise.resolve(stockCatalogueCache);
+  if (!stockCatalogueRequest) {
+    stockCatalogueRequest = fetch("/api/robinhood/stocks?v=4", {
+      cache: "force-cache",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("stock catalogue unavailable");
+        const data = (await response.json()) as { stocks?: RobinhoodStock[] };
+        stockCatalogueCache = data.stocks ?? [];
+        return stockCatalogueCache;
+      })
+      .finally(() => {
+        stockCatalogueRequest = null;
+      });
+  }
+  return stockCatalogueRequest;
+}
+
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
   const [source, setSource] = useState(stock.imageUrl);
   return (
@@ -130,19 +152,9 @@ export default function CreatePage() {
   useEffect(() => {
     let cancelled = false;
     setStocksLoading(true);
-    const timer = setTimeout(() => {
-      fetch(
-        `/api/robinhood/stocks?v=3${
-          stockQuery.trim() ? `&search=${encodeURIComponent(stockQuery.trim())}` : ""
-        }`,
-        { cache: "no-store" },
-      )
-      .then(async (response) => {
-        if (!response.ok) throw new Error("stock catalogue unavailable");
-        return (await response.json()) as { stocks?: RobinhoodStock[] };
-      })
-      .then((data) => {
-        if (!cancelled) setStocks(data.stocks ?? []);
+    loadStockCatalogue()
+      .then((catalogue) => {
+        if (!cancelled) setStocks(catalogue);
       })
       .catch(() => {
         if (!cancelled) setStocks([]);
@@ -150,12 +162,10 @@ export default function CreatePage() {
       .finally(() => {
         if (!cancelled) setStocksLoading(false);
       });
-    }, stockQuery.trim() ? 350 : 0);
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, [stockQuery]);
+  }, []);
 
   const matchingStocks = useMemo(() => {
     const query = stockQuery.trim().toLowerCase();
@@ -430,7 +440,7 @@ export default function CreatePage() {
                 </p>
                 <input
                   id="paired-stock"
-                  className={inputCls}
+                  className={`${inputCls} border-white/80 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(15,23,42,0.45)] backdrop-blur-xl`}
                   placeholder="Search by ticker or company"
                   value={stockQuery}
                   onChange={(event) => setStockQuery(event.target.value)}
@@ -439,7 +449,7 @@ export default function CreatePage() {
                   <button
                     type="button"
                     onClick={() => setPairedStock(null)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-lime-300 bg-lime-50 p-3 text-left"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-lime-200 bg-lime-50/70 p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(132,204,22,0.45)] backdrop-blur-xl"
                   >
                     <StockLogo stock={pairedStock} />
                     <span className="min-w-0 flex-1">
@@ -450,9 +460,19 @@ export default function CreatePage() {
                   </button>
                 )}
                 {!pairedStock && (
-                  <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 p-1">
+                  <div className="max-h-64 overflow-y-auto rounded-2xl border border-white/80 bg-white/60 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_14px_30px_-22px_rgba(15,23,42,0.5)] backdrop-blur-xl">
                     {stocksLoading ? (
-                      <p className="p-4 text-center text-xs text-neutral-500">Loading Robinhood catalogue…</p>
+                      <div className="space-y-1 p-2">
+                        {Array.from({ length: 5 }).map((_, index) => (
+                          <div key={index} className="flex items-center gap-3 rounded-xl px-2 py-2">
+                            <div className="h-6 w-6 animate-pulse rounded-full bg-neutral-200" />
+                            <div className="flex-1 space-y-1.5">
+                              <div className="h-3 w-16 animate-pulse rounded bg-neutral-200" />
+                              <div className="h-2.5 w-32 animate-pulse rounded bg-neutral-100" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     ) : matchingStocks.length === 0 ? (
                       <p className="p-4 text-center text-xs text-neutral-500">No matching stocks found.</p>
                     ) : (
@@ -464,7 +484,7 @@ export default function CreatePage() {
                             setPairedStock(stock);
                             setStockQuery("");
                           }}
-                          className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white"
+                          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/85 hover:shadow-sm"
                         >
                           <StockLogo stock={stock} />
                           <span className="min-w-0">
