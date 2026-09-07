@@ -24,8 +24,11 @@ chain" state when a pad address is missing.
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_PAD_ADDRESS_BASE_SEPOLIA` | PotatoPad contract address on Base Sepolia |
+| `NEXT_PUBLIC_CURVE_PAD_ADDRESS_ROBINHOOD` | Primary PotatoCurvePad address on Robinhood Chain (chain id `4663`) |
+| `NEXT_PUBLIC_PAD_ADDRESS_ROBINHOOD` | Legacy PotatoPad address on Robinhood Chain; kept for existing tokens |
 | `NEXT_PUBLIC_PAD_ADDRESS_LOCALHOST` | PotatoPad contract address on a local Hardhat node (chain id 31337) |
 | `NEXT_PUBLIC_WETH_ADDRESS_LOCALHOST` | WETH address on the local Hardhat node (used for locker fee claims). Base Sepolia WETH is hardcoded to `0x4200000000000000000000000000000000000006`. |
+| `ROBINHOOD_RPC_URL` (and `_2`, `_3`) | Server-only Robinhood RPC pool; the public RPC is used as a fallback |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect Cloud project id. Falls back to a demo placeholder so builds never require a real one; injected/browser wallets work regardless. |
 
 ## Local development against Hardhat
