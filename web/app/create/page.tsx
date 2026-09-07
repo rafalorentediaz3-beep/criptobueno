@@ -765,7 +765,7 @@ export default function CreatePage() {
           </div>
 
           {/* RIGHT: shield + submit */}
-          <div className="flex flex-col gap-4 md:col-span-2 md:sticky md:top-24 md:min-h-[640px]">
+          <div className="relative flex flex-col gap-4 md:col-span-2 md:sticky md:top-24 md:min-h-[640px]">
             {vampBlocked ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_28px_-22px_rgba(225,29,72,0.55)] backdrop-blur-xl">
                 <div className="flex items-start gap-3">
@@ -814,7 +814,7 @@ export default function CreatePage() {
                 </button>
               </div>
             )}
-            <div className="flex flex-1 items-center justify-center">
+            <div className="md:absolute md:inset-x-0 md:top-1/2 md:-translate-y-1/2">
               <div className="w-full">
                 <div className="launch-cta-border">
                   <button
@@ -830,10 +830,10 @@ export default function CreatePage() {
                     {submitLabel}
                   </button>
                 </div>
-
-                <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
               </div>
             </div>
+
+            <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
           </div>
         </div>
       </ConnectGate>
