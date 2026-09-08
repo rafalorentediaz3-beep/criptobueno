@@ -51,12 +51,6 @@ function rateLimited(ip: string): boolean {
 
 export async function POST(req: NextRequest) {
   const jwt = process.env.PINATA_JWT;
-  if (!jwt) {
-    return NextResponse.json(
-      { error: "image upload not configured (PINATA_JWT missing)" },
-      { status: 503 },
-    );
-  }
 
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -85,6 +79,25 @@ export async function POST(req: NextRequest) {
   // blob (HTML/JS/SVG) past the allowlist and pin it to IPFS on our Pinata quota.
   if (!file.type || !ALLOWED_TYPES.has(file.type)) {
     return NextResponse.json({ error: "unsupported or missing image type" }, { status: 415 });
+  }
+
+  // Local development can preview and test launches without requiring a
+  // production Pinata secret. Data URIs are deliberately accepted only on
+  // loopback hosts; deployed environments still fail clearly when Pinata is
+  // not configured.
+  const host = req.headers.get("host")?.split(":")[0]?.toLowerCase();
+  if (!jwt && (host === "localhost" || host === "127.0.0.1" || host === "::1")) {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    return NextResponse.json({
+      uri: `data:${file.type};base64,${bytes.toString("base64")}`,
+    });
+  }
+
+  if (!jwt) {
+    return NextResponse.json(
+      { error: "image upload not configured (PINATA_JWT missing)" },
+      { status: 503 },
+    );
   }
 
   const pinataForm = new FormData();
