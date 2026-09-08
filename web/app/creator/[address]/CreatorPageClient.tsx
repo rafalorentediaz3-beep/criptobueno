@@ -56,11 +56,11 @@ function Stat({
   sub?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/80 bg-white/55 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-18px_rgba(15,23,42,0.5)] backdrop-blur-md">
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_20px_-18px_rgba(0,0,0,0.6)] backdrop-blur-md">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
         {label}
       </p>
-      <p className="mt-1 truncate font-mono text-sm font-bold text-neutral-900">{value}</p>
+      <p className="mt-1 truncate font-mono text-sm font-bold text-neutral-100">{value}</p>
       {sub && <p className="mt-0.5 text-[10px] text-neutral-500">{sub}</p>}
     </div>
   );
@@ -216,8 +216,8 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
 
   if (!valid || !address) {
     return (
-      <div className="mx-auto max-w-lg rounded-3xl border border-white/80 bg-white/65 p-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_40px_-28px_rgba(15,23,42,0.5)] backdrop-blur-xl">
-        <h2 className="text-lg font-bold text-neutral-900">Invalid address</h2>
+      <div className="mx-auto max-w-lg rounded-3xl border border-white/10 bg-white/5 p-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_16px_40px_-28px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+        <h2 className="text-lg font-bold text-neutral-100">Invalid address</h2>
         <p className="mt-2 text-sm text-neutral-500">That URL is not a valid wallet address.</p>
         <Link href="/" className="btn-secondary mt-5 inline-flex">
           Back to Discover
@@ -234,11 +234,11 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
   // connected planter "you never launched" when the feed is empty — that is indexing lag.
   const emptyState =
     mine.length === 0 ? (
-      <div className="mx-auto max-w-lg rounded-3xl border border-white/80 bg-white/65 p-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_40px_-28px_rgba(15,23,42,0.5)] backdrop-blur-xl">
+      <div className="mx-auto max-w-lg rounded-3xl border border-white/10 bg-white/5 p-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_16px_40px_-28px_rgba(0,0,0,0.6)] backdrop-blur-xl">
         {isLoading && !feedTimedOut && feedState !== "stale" ? (
           <>
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900" />
-            <h2 className="mt-4 text-lg font-bold text-neutral-900">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-neutral-800 border-t-neutral-100" />
+            <h2 className="mt-4 text-lg font-bold text-neutral-100">
               Loading launch activity
             </h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">
@@ -248,7 +248,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
         ) : isYou ? (
           <>
             <Sprout className="mx-auto h-10 w-10 text-amber-500/80" aria-hidden />
-            <h2 className="mt-4 text-lg font-bold text-neutral-900">
+            <h2 className="mt-4 text-lg font-bold text-neutral-100">
               Looking for your plants…
             </h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">
@@ -267,7 +267,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
           </>
         ) : feedState === "stale" ? (
           <>
-            <h2 className="text-lg font-bold text-neutral-900">
+            <h2 className="text-lg font-bold text-neutral-100">
               No plants found in the last updated data
             </h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">
@@ -285,7 +285,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
         ) : (
           <>
             <Sprout className="mx-auto h-10 w-10 text-green-500/70" aria-hidden />
-            <h2 className="mt-4 text-lg font-bold text-neutral-900">No coins planted yet</h2>
+            <h2 className="mt-4 text-lg font-bold text-neutral-100">No coins planted yet</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">
               {shortAddress(address)} hasn&apos;t planted a coin on PotatoPad (Robinhood)
               yet. Anything they launch will show up here.
@@ -306,17 +306,17 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
       {editing && profile && (
         <EditProfileModal profile={profile} onClose={() => setEditing(false)} />
       )}
-      <div className="mb-7 overflow-hidden rounded-3xl border border-white/80 bg-white/65 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_45px_-32px_rgba(15,23,42,0.55)] backdrop-blur-xl sm:p-7">
+      <div className="mb-7 overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_45px_-32px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
             <ProfileAvatar address={address} avatarUrl={profile?.avatarUrl} size="lg" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl">
+                <h1 className="text-xl font-bold tracking-tight text-neutral-100 sm:text-2xl">
                   {profile?.username ?? shortAddress(address)}
                 </h1>
                 {isYou && (
-                  <span className="rounded-full border border-lime-300 bg-lime-100 px-2.5 py-0.5 text-xs font-semibold text-lime-800">
+                  <span className="rounded-full border border-lime-500/30 bg-lime-500/15 px-2.5 py-0.5 text-xs font-semibold text-lime-300">
                     You
                   </span>
                 )}
@@ -414,7 +414,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-neutral-700">
+        <h2 className="text-sm font-semibold text-neutral-300">
           Coins planted
           {pricesQuery.isFetching && (
             <span className="ml-2 text-xs font-normal text-neutral-500">updating prices…</span>
@@ -426,7 +426,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
               type="button"
               disabled={safePage <= 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="rounded-full border border-neutral-200 bg-white/70 px-2.5 py-1 text-neutral-700 shadow-sm disabled:opacity-40"
+              className="rounded-full border border-neutral-800 bg-white/5 px-2.5 py-1 text-neutral-300 shadow-sm disabled:opacity-40"
             >
               Prev
             </button>
@@ -437,7 +437,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
               type="button"
               disabled={safePage >= pageCount - 1}
               onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-              className="rounded-full border border-neutral-200 bg-white/70 px-2.5 py-1 text-neutral-700 shadow-sm disabled:opacity-40"
+              className="rounded-full border border-neutral-800 bg-white/5 px-2.5 py-1 text-neutral-300 shadow-sm disabled:opacity-40"
             >
               Next
             </button>

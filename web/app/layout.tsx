@@ -7,6 +7,7 @@ import { ChainSync } from "@/components/ChainSync";
 import { DisclaimerGate } from "@/components/DisclaimerGate";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { MoneyParticles } from "@/components/MoneyParticles";
 import { SearchProvider } from "@/components/SearchContext";
 import { SITE_URL } from "@/lib/config";
 
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_70%_45%_at_50%_-8%,rgba(255,255,255,0.03),transparent_70%)]"
         />
+        <MoneyParticles />
         {process.env.NODE_ENV === "production" && gaId && (
           <>
             <Script

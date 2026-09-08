@@ -50,7 +50,7 @@ export function ProfileAvatar({
 
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/80 shadow-[0_8px_20px_-12px_rgba(15,23,42,0.65)] ${box} ${className}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 shadow-[0_8px_20px_-12px_rgba(0,0,0,0.7)] ${box} ${className}`}
       style={{
         background: `linear-gradient(${angle}deg, hsl(${hue1} 55% ${light1}%), hsl(${hue2} 60% ${light2}%))`,
       }}

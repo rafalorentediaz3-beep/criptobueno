@@ -4,13 +4,13 @@
 
 @layer base {
   body {
-    @apply bg-[#f5f6f7] text-neutral-900 antialiased selection:bg-lime-200;
+    @apply bg-[#0a0a0a] text-neutral-100 antialiased selection:bg-lime-900/60;
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-neutral-200 bg-white;
+    @apply rounded-2xl border border-neutral-800 bg-neutral-900;
   }
 
   .btn {
@@ -18,11 +18,11 @@
   }
 
   .btn-primary {
-    @apply btn bg-neutral-900 text-white hover:bg-neutral-700;
+    @apply btn bg-neutral-100 text-neutral-900 hover:bg-white;
   }
 
   .btn-secondary {
-    @apply btn border border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-950;
+    @apply btn border border-neutral-800 bg-neutral-900 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-800 hover:text-neutral-50;
   }
 
   .btn-danger {
@@ -30,7 +30,7 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5;
+    @apply w-full rounded-xl border border-neutral-800 bg-neutral-900 px-3.5 py-2.5 text-neutral-100 placeholder-neutral-500 outline-none transition-colors focus:border-neutral-600 focus:ring-4 focus:ring-white/5;
   }
 
   .label {
@@ -38,7 +38,7 @@
   }
 
   .skeleton {
-    @apply animate-pulse rounded-lg bg-neutral-200;
+    @apply animate-pulse rounded-lg bg-neutral-800;
   }
 
     .launch-cta-border {
@@ -207,5 +207,40 @@
   .buy-chip,
   .card-enter {
     animation: none;
+  }
+}
+
+/* Ambient background: faint green dollar particles drifting upward. */
+@keyframes money-rise {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--money-opacity, 0.16);
+  }
+  92% {
+    opacity: var(--money-opacity, 0.16);
+  }
+  100% {
+    transform: translate3d(var(--money-drift, 24px), -115vh, 0) rotate(12deg);
+    opacity: 0;
+  }
+}
+
+.money-particle {
+  position: absolute;
+  bottom: -8%;
+  left: var(--money-left, 50%);
+  color: #22c55e;
+  animation: money-rise var(--money-duration, 18s) linear infinite;
+  animation-delay: var(--money-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .money-particle {
+    animation: none;
+    opacity: 0;
   }
 }

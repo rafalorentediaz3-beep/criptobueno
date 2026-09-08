@@ -35,7 +35,7 @@ const CREATOR_HALF_PCT = 50;
 const MAX_CREATOR_CUT_PCT = CREATOR_HALF_PCT - 5;
 
 const inputCls =
-  "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5";
+  "w-full rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 placeholder-neutral-500 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5";
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
 
 let stockCatalogueCache: RobinhoodStock[] | null = null;
@@ -526,9 +526,9 @@ export default function CreatePage() {
       <ConnectGate>
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           {/* LEFT: input matrix */}
-          <div className="space-y-6 rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_20px_55px_-36px_rgba(15,23,42,0.5)] backdrop-blur-xl sm:p-7 md:col-span-3">
-            <div className="border-b border-neutral-100 pb-5">
-              <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+          <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_55px_-36px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:p-7 md:col-span-3">
+            <div className="border-b border-neutral-800 pb-5">
+              <h1 className="text-2xl font-semibold tracking-tight text-neutral-100">
                 Launch token
               </h1>
             </div>
@@ -569,7 +569,7 @@ export default function CreatePage() {
                 </label>
                 <input
                   id="paired-stock"
-                  className={`${inputCls} border-white/80 bg-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(15,23,42,0.45)] backdrop-blur-xl`}
+                  className={`${inputCls} border-white/10 bg-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_20px_-16px_rgba(0,0,0,0.6)] backdrop-blur-xl`}
                   placeholder="Search by ticker or company"
                   value={stockQuery}
                   onChange={(event) => setStockQuery(event.target.value)}
@@ -578,18 +578,18 @@ export default function CreatePage() {
                   <button
                     type="button"
                     onClick={() => setPairedStock(null)}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-lime-200 bg-lime-50/70 p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(132,204,22,0.45)] backdrop-blur-xl"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-lime-500/30 bg-lime-500/10 p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_20px_-16px_rgba(132,204,22,0.35)] backdrop-blur-xl"
                   >
                     <StockLogo stock={pairedStock} />
                     <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-sm text-neutral-900">{pairedStock.symbol}</strong>
+                      <strong className="block truncate text-sm text-neutral-100">{pairedStock.symbol}</strong>
                       <span className="block truncate text-xs text-neutral-500">{pairedStock.name}</span>
                     </span>
                     <span className="text-xs text-neutral-500">Change</span>
                   </button>
                 )}
                 {!pairedStock && (
-                  <div className="max-h-64 overflow-y-auto rounded-2xl border border-white/80 bg-white/60 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_14px_30px_-22px_rgba(15,23,42,0.5)] backdrop-blur-xl">
+                  <div className="max-h-64 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_14px_30px_-22px_rgba(0,0,0,0.6)] backdrop-blur-xl">
                     {stocksLoading ? (
                       <div className="space-y-1 p-2">
                         {Array.from({ length: 5 }).map((_, index) => (
@@ -597,7 +597,7 @@ export default function CreatePage() {
                             <div className="h-6 w-6 animate-pulse rounded-full bg-neutral-200" />
                             <div className="flex-1 space-y-1.5">
                               <div className="h-3 w-16 animate-pulse rounded bg-neutral-200" />
-                              <div className="h-2.5 w-32 animate-pulse rounded bg-neutral-100" />
+                              <div className="h-2.5 w-32 animate-pulse rounded bg-neutral-800" />
                             </div>
                           </div>
                         ))}
@@ -613,11 +613,11 @@ export default function CreatePage() {
                             setPairedStock(stock);
                             setStockQuery("");
                           }}
-                          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/85 hover:shadow-sm"
+                          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/10 hover:shadow-sm"
                         >
                           <StockLogo stock={stock} />
                           <span className="min-w-0">
-                            <strong className="block text-sm text-neutral-900">{stock.symbol}</strong>
+                            <strong className="block text-sm text-neutral-100">{stock.symbol}</strong>
                             <span className="block truncate text-xs text-neutral-500">{stock.name}</span>
                           </span>
                         </button>
@@ -632,7 +632,7 @@ export default function CreatePage() {
                   <label className={labelCls}>Image</label>
                 </div>
                 <div className="flex gap-3">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/80 bg-neutral-50 shadow-sm">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-neutral-800 shadow-sm">
                     {previewSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={previewSrc} alt="" className="h-full w-full object-cover" />
@@ -642,7 +642,7 @@ export default function CreatePage() {
                       <span className="text-neutral-700">—</span>
                     )}
                   </div>
-                  <label className="flex flex-1 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white/55 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-white">
+                  <label className="flex flex-1 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-neutral-700 bg-white/5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:bg-white/10">
                     {uploading ? "Uploading…" : "Choose image"}
                     <input
                       type="file"
@@ -654,7 +654,7 @@ export default function CreatePage() {
                   </label>
                 </div>
                 {uploadErr && (
-                  <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs leading-relaxed text-rose-700">
+                  <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 text-xs leading-relaxed text-rose-300">
                     {uploadErr.includes("PINATA_JWT")
                       ? "Image uploads are not configured yet. Add PINATA_JWT to the server environment and try again."
                       : uploadErr}
@@ -724,7 +724,7 @@ export default function CreatePage() {
                 />
               </div>
 
-              <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4 space-y-1.5">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-800/40 p-4 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="devbuy" className={labelCls}>
                     Dev buy (ETH)
@@ -761,7 +761,7 @@ export default function CreatePage() {
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-neutral-100 pt-5">
+              <div className="space-y-3 border-t border-neutral-800 pt-5">
                 <div>
                   <label className={labelCls}>Launch venue</label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
@@ -772,10 +772,10 @@ export default function CreatePage() {
                       className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                         launchMode === "v3"
                           ? "border-amber-500/60 bg-amber-500/10"
-                          : "border-neutral-200 bg-white hover:border-neutral-300"
+                          : "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
                       } ${!canLaunch ? "cursor-not-allowed opacity-40" : ""}`}
                     >
-                      <span className="block text-xs font-bold text-neutral-900">Uniswap v3</span>
+                      <span className="block text-xs font-bold text-neutral-100">Uniswap v3</span>
                       <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                         Bonding curve + dev buy.
                       </span>
@@ -789,11 +789,11 @@ export default function CreatePage() {
                       }}
                       className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                         launchMode === "v4"
-                          ? "border-lime-400 bg-lime-50"
-                          : "border-neutral-200 bg-white hover:border-neutral-300"
+                          ? "border-lime-400 bg-lime-500/10"
+                          : "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
                       } ${!canV4Launch ? "cursor-not-allowed opacity-40" : ""}`}
                     >
-                      <span className="block text-xs font-bold text-neutral-900">Uniswap v4</span>
+                      <span className="block text-xs font-bold text-neutral-100">Uniswap v4</span>
                       <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                         Locked initial liquidity.
                       </span>
@@ -801,7 +801,7 @@ export default function CreatePage() {
                   </div>
                 </div>
                 {isV4 && (
-                  <div className="space-y-1.5 rounded-xl border border-neutral-200 bg-white p-3.5">
+                  <div className="space-y-1.5 rounded-xl border border-neutral-800 bg-neutral-900 p-3.5">
                     <label htmlFor="v4fee" className={labelCls}>
                       Trading fee
                     </label>
@@ -832,11 +832,11 @@ export default function CreatePage() {
                     onClick={() => setRewardsOn(false)}
                     className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                       rewardsOn
-                        ? "border-neutral-200 bg-white hover:border-neutral-300"
+                        ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
                         : "border-amber-500/60 bg-amber-500/10"
                     }`}
                   >
-                    <span className="block text-xs font-bold text-neutral-900">Dev fees</span>
+                    <span className="block text-xs font-bold text-neutral-100">Dev fees</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                       You receive fees.
                     </span>
@@ -846,11 +846,11 @@ export default function CreatePage() {
                     onClick={() => setRewardsOn(true)}
                     className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                       rewardsOn
-                        ? "border-lime-400 bg-lime-50"
-                        : "border-neutral-200 bg-white hover:border-neutral-300"
+                        ? "border-lime-400 bg-lime-500/10"
+                        : "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
                     }`}
                   >
-                    <span className="block text-xs font-bold text-neutral-900">Holder rewards</span>
+                    <span className="block text-xs font-bold text-neutral-100">Holder rewards</span>
                     <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
                       Holders earn fees.
                     </span>
@@ -858,7 +858,7 @@ export default function CreatePage() {
                     </div>
 
                     {rewardsOn && (
-                      <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
+                      <div className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-800/40 p-3.5">
                     <div className="flex items-baseline justify-between">
                       <label htmlFor="creatorcut" className={labelCls}>
                         Your cut
@@ -895,7 +895,7 @@ export default function CreatePage() {
                             <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                             {label}
                           </dt>
-                          <dd className="mt-0.5 font-mono text-xs tabular-nums text-neutral-900">
+                          <dd className="mt-0.5 font-mono text-xs tabular-nums text-neutral-100">
                             {pct}
                           </dd>
                         </div>
@@ -909,7 +909,7 @@ export default function CreatePage() {
                     )}
                   </>
                 ) : (
-                  <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-800/40 p-3.5">
                     <label className={labelCls}>Fee recipients</label>
                     <p className="mt-1 text-[10px] leading-relaxed text-neutral-600">
                       v4 launches use the locked fee locker: 50% to the creator and 50% to
@@ -924,18 +924,18 @@ export default function CreatePage() {
           {/* RIGHT: shield + submit */}
           <div className="relative flex flex-col gap-4 md:col-span-2 md:sticky md:top-24 md:min-h-[640px]">
             {vampBlocked ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50/75 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_28px_-22px_rgba(225,29,72,0.55)] backdrop-blur-xl">
+              <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_12px_28px_-22px_rgba(225,29,72,0.4)] backdrop-blur-xl">
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs text-rose-600">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-xs text-rose-400">
                     !
                   </span>
                   <div className="min-w-0 space-y-1.5">
-                    <h4 className="text-xs font-semibold tracking-tight text-rose-900">
+                    <h4 className="text-xs font-semibold tracking-tight text-rose-200">
                       Name unavailable
                     </h4>
-                    <p className="text-[11px] leading-relaxed text-rose-700/80">
+                    <p className="text-[11px] leading-relaxed text-rose-300/80">
                       {nameBlocked ? "Name" : "Symbol"}{" "}
-                      <span className="font-mono font-semibold text-rose-900">
+                      <span className="font-mono font-semibold text-rose-200">
                         {(nameBlocked ? name : symbol).trim()}
                       </span>{" "}
                       is protected. Choose another.
@@ -944,8 +944,8 @@ export default function CreatePage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-3xl border border-white/80 bg-white/65 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_40px_-24px_rgba(15,23,42,0.45)] backdrop-blur-xl">
-                <h4 className="text-base font-semibold tracking-tight text-neutral-900">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_18px_40px_-24px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+                <h4 className="text-base font-semibold tracking-tight text-neutral-100">
                   Name check
                 </h4>
                 <p className="mt-2 text-sm leading-6 text-neutral-500">
@@ -955,8 +955,8 @@ export default function CreatePage() {
             )}
 
             {staleClient && (
-              <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-amber-700">
+              <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400">
                   Update required
                 </h4>
                 <p className="text-[11px] leading-relaxed text-neutral-400">

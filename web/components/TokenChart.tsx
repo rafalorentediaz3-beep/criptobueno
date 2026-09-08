@@ -153,9 +153,9 @@ export function TokenChart({
                 : "This token trades live on Uniswap V3. A price chart isn't indexed on this network yet."}
           </p>
           {isV4 && (
-            <div className="w-full max-w-3xl rounded-lg border border-neutral-200 bg-white p-3 text-left shadow-sm">
+            <div className="w-full max-w-3xl rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left shadow-sm">
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-mono text-sm text-amber-700">
+                <span className="font-mono text-sm text-amber-400">
                   {priceWeth > 0 ? `${priceWeth.toFixed(12)} WETH` : "Loading price…"}
                 </span>
                 <div className="flex gap-1">
@@ -164,7 +164,7 @@ export function TokenChart({
                       key={item}
                       type="button"
                       onClick={() => setRange(item)}
-                      className={`rounded px-2 py-1 text-[10px] ${range === item ? "bg-amber-500 text-black" : "bg-neutral-100 text-neutral-500"}`}
+                      className={`rounded px-2 py-1 text-[10px] ${range === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
                     >
                       {item}
                     </button>
@@ -172,8 +172,8 @@ export function TokenChart({
                 </div>
               </div>
               <svg viewBox="0 0 100 100" className="h-44 w-full" role="img" aria-label="V4 price chart">
-                <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#e5e7eb" strokeWidth="0.5" />
-                {chartPath && <path d={chartPath} fill="none" stroke="#b7791f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+                <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#27272a" strokeWidth="0.5" />
+                {chartPath && <path d={chartPath} fill="none" stroke="#f2b90f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
               </svg>
               <p className="mt-1 text-[10px] text-neutral-500">On-chain Uniswap V4 swaps · updates every 15 seconds</p>
             </div>

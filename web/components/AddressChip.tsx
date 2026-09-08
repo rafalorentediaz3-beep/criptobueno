@@ -30,13 +30,13 @@ export function AddressChip({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-white/70 px-2.5 py-1 font-mono text-xs text-neutral-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_-10px_rgba(15,23,42,0.45)] backdrop-blur-md ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-xs text-neutral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_4px_12px_-10px_rgba(0,0,0,0.6)] backdrop-blur-md ${className}`}
     >
       <span>{shortAddress(address)}</span>
       <button
         type="button"
         onClick={copy}
-        className="text-neutral-400 transition-colors hover:text-neutral-900"
+        className="text-neutral-500 transition-colors hover:text-neutral-100"
         title="Copy address"
       >
         {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
@@ -46,7 +46,7 @@ export function AddressChip({
           href={explorer}
           target="_blank"
           rel="noreferrer"
-          className="text-neutral-400 transition-colors hover:text-neutral-900"
+          className="text-neutral-500 transition-colors hover:text-neutral-100"
           title="View on explorer"
         >
           <ExternalLink className="h-3.5 w-3.5" />

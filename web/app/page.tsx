@@ -45,7 +45,7 @@ type Slot0 = readonly [bigint, number, number, number, number, number, boolean];
 
 function CardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+    <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900">
       <div className="skeleton aspect-square w-full rounded-none" />
       <div className="space-y-2 p-4">
         <div className="skeleton h-3 w-2/3" />
@@ -282,13 +282,13 @@ export default function DiscoverPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tokens"
-          className="w-full rounded-full border border-neutral-200 bg-white py-3.5 pl-11 pr-4 text-sm text-neutral-900 shadow-sm outline-none placeholder:text-neutral-400 focus:border-neutral-300 focus:ring-4 focus:ring-neutral-900/5"
+          className="w-full rounded-full border border-neutral-800 bg-neutral-900 py-3.5 pl-11 pr-4 text-sm text-neutral-100 shadow-sm outline-none placeholder:text-neutral-500 focus:border-neutral-700 focus:ring-4 focus:ring-white/5"
         />
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 rounded-full border border-white/80 bg-white/60 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] backdrop-blur-xl">
+          <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-18px_rgba(0,0,0,0.6)] backdrop-blur-xl">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -296,8 +296,8 @@ export default function DiscoverPage() {
                 onClick={() => setTab(t.id)}
                 className={`${segBase} ${
                   tab === t.id
-                    ? "bg-neutral-900 text-white shadow-[0_5px_14px_-8px_rgba(15,23,42,0.8)]"
-                    : "text-neutral-500 hover:bg-white/80 hover:text-neutral-900"
+                    ? "bg-neutral-800 text-neutral-100 shadow-[0_5px_14px_-8px_rgba(0,0,0,0.8)]"
+                    : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
                 }`}
               >
                 {t.label}
@@ -306,14 +306,14 @@ export default function DiscoverPage() {
           </div>
 
           {!isAncientTab && (
-            <div className="flex flex-wrap gap-1 rounded-full border border-white/80 bg-white/60 p-1.5 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] backdrop-blur-xl">
+            <div className="flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-18px_rgba(0,0,0,0.6)] backdrop-blur-xl">
               {SORTS.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => setSort(s.id)}
                   className={`rounded-full px-3.5 py-2 text-[11px] transition-all ${
-                  sort === s.id ? "bg-lime-100 text-lime-900 shadow-sm ring-1 ring-lime-200" : "text-neutral-500 hover:bg-white/80 hover:text-neutral-900"
+                  sort === s.id ? "bg-lime-500/20 text-lime-300 shadow-sm ring-1 ring-lime-500/30" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
                   }`}
                 >
                   {s.id === "recent" && (
@@ -329,30 +329,30 @@ export default function DiscoverPage() {
 
       {/* Mobile search — the header search bar is desktop-only (md:block). */}
       <div className="relative md:hidden">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
         <input
           type="search"
           aria-label="Search coins by name or symbol"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tokens"
-          className="w-full rounded-full border border-neutral-200 bg-white py-3 pl-11 pr-4 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-300 focus:ring-4 focus:ring-neutral-900/5"
+          className="w-full rounded-full border border-neutral-800 bg-neutral-900 py-3 pl-11 pr-4 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-neutral-700 focus:ring-4 focus:ring-white/5"
         />
       </div>
 
       {/* Container panel: amber accent for Growing, stone-gray for Ancients */}
       <div
-        className={`rounded-[28px] border bg-white p-5 sm:p-7 ${
+        className={`rounded-[28px] border bg-neutral-900 p-5 sm:p-7 ${
           isAncientTab
-            ? "border-neutral-200 shadow-[0_18px_60px_-35px_rgba(15,23,42,0.22)]"
-            : "border-lime-200 bg-gradient-to-br from-lime-50 via-white to-white shadow-[0_18px_60px_-35px_rgba(132,204,22,0.38)]"
+            ? "border-neutral-800 shadow-[0_18px_60px_-35px_rgba(0,0,0,0.5)]"
+            : "border-lime-900/60 bg-gradient-to-br from-lime-950/40 via-neutral-900 to-neutral-900 shadow-[0_18px_60px_-35px_rgba(132,204,22,0.25)]"
         }`}
       >
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-medium tracking-tight text-neutral-900 sm:text-3xl">
+            <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
               {isAncientTab ? "Ancient Heritage" : "Growing"}
-              <span className="ml-2 inline-flex rounded-full bg-lime-100 px-2.5 py-1 align-middle text-xs font-medium text-lime-800">
+              <span className="ml-2 inline-flex rounded-full bg-lime-500/20 px-2.5 py-1 align-middle text-xs font-medium text-lime-300">
                 {activeRows.length}
               </span>
             </h1>
@@ -360,7 +360,7 @@ export default function DiscoverPage() {
               {isAncientTab ? "Verified legacy runners from Robinhood." : "Tokens still climbing toward graduation on Robinhood Chain."}
             </p>
           </div>
-          <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-700 sm:inline-flex">
+          <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-neutral-800 px-4 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-neutral-700 sm:inline-flex">
             <span className="text-lg leading-none">+</span> Create
           </Link>
         </div>
@@ -374,8 +374,8 @@ export default function DiscoverPage() {
           <div className="mx-auto max-w-lg px-6 py-12 text-center">
             {isAncientTab ? (
               <>
-                <Hourglass className="mx-auto h-10 w-10 text-amber-600/70" aria-hidden />
-                <h2 className="mt-4 text-lg font-bold text-neutral-900">No ancient tokens yet</h2>
+                <Hourglass className="mx-auto h-10 w-10 text-amber-500/70" aria-hidden />
+                <h2 className="mt-4 text-lg font-bold text-neutral-100">No ancient tokens yet</h2>
                 <p className="mt-2 text-sm text-neutral-500">
                   Couldn&apos;t load the pre-existing Robinhood runners right now. Try again in a
                   moment.
@@ -384,7 +384,7 @@ export default function DiscoverPage() {
             ) : (
               <>
                 <Sprout className="mx-auto h-10 w-10 text-green-500/70" aria-hidden />
-                <h2 className="mt-4 text-lg font-bold text-neutral-900">Nothing planted yet</h2>
+                <h2 className="mt-4 text-lg font-bold text-neutral-100">Nothing planted yet</h2>
                 <p className="mt-2 text-sm text-neutral-500">
                   Be the first to plant a coin. It launches straight onto Uniswap V3, live from the
                   first block.
@@ -397,7 +397,7 @@ export default function DiscoverPage() {
           </div>
         ) : visible.length === 0 ? (
           <div className="mx-auto max-w-lg px-6 py-12 text-center">
-            <h2 className="text-lg font-bold text-neutral-900">No coins match</h2>
+            <h2 className="text-lg font-bold text-neutral-100">No coins match</h2>
             <p className="mt-2 text-sm text-neutral-500">
               {query.trim()
                 ? `Nothing matches “${query.trim()}” in this patch of the field.`
