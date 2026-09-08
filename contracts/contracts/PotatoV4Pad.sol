@@ -166,10 +166,14 @@ contract PotatoV4Pad is ReentrancyGuard {
         int24 floor = _alignToSpacing(
             TickMath.getTickAtSqrtRatio(_sqrtPriceX96FromFdv(startFdv)), tickSpacing
         );
-        int24 minTick = (TickMath.MIN_TICK / tickSpacing) * tickSpacing;
         int24 maxTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
-        int24 lower = tokenIs0 ? floor : minTick;
-        int24 upper = tokenIs0 ? maxTick : -floor;
+        // The position must include the initial tick to have active liquidity.
+        // For token1, the initial price is the inverted FDV, so the range
+        // starts at -floor and extends upward; using minTick/-floor placed the
+        // position entirely below the initial price and left active liquidity at
+        // zero.
+        int24 lower = tokenIs0 ? floor : -floor;
+        int24 upper = maxTick;
         uint160 sqrtPrice = TickMath.getSqrtRatioAtTick(tokenIs0 ? floor : -floor);
 
         IUniswapV4PoolManager.PoolKey memory key = IUniswapV4PoolManager.PoolKey({
