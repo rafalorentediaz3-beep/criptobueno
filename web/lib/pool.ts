@@ -9,7 +9,12 @@ import { encodePacked, keccak256 } from "viem";
 import type { Address, Hex } from "viem";
 import { useQuery } from "@tanstack/react-query";
 import { useChainId, usePublicClient, useReadContract, useReadContracts } from "wagmi";
-import { potatoCurvePadAbi, potatoPadAbi } from "@/lib/abi";
+import {
+  potatoCurvePadAbi,
+  potatoPadAbi,
+  potatoV4FeeLockerAbi,
+  potatoV4PadAbi,
+} from "@/lib/abi";
 import { CURVE_PAD_ADDRESSES, V4_POOL_MANAGER_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
 import { usePad } from "@/lib/hooks";
 
@@ -571,6 +576,7 @@ export function useAccruedFees(
   lpTokenId: bigint | undefined,
   pool: Address | undefined,
   pad: Address | undefined,
+  isV4 = false,
 ): AccruedFees {
   const { weth, chainId } = usePad();
   const client = usePublicClient();
@@ -582,7 +588,7 @@ export function useAccruedFees(
   const padReady = !!pad && pad !== ZERO_ADDRESS;
   const { data: lockerData } = useReadContract({
     address: pad,
-    abi: potatoPadAbi,
+    abi: isV4 ? potatoV4PadAbi : potatoPadAbi,
     functionName: "locker",
     query: { enabled: padReady },
   });
@@ -590,18 +596,30 @@ export function useAccruedFees(
     address: pad,
     abi: potatoPadAbi,
     functionName: "positionManager",
-    query: { enabled: padReady },
+    query: { enabled: padReady && !isV4 },
   });
   const { data: token0Data } = useReadContract({
     address: pool,
     abi: uniswapV3PoolAbi,
     functionName: "token0",
-    query: { enabled: !!pool && pool !== ZERO_ADDRESS },
+    query: { enabled: !!pool && pool !== ZERO_ADDRESS && !isV4 },
+  });
+  const { data: v4PositionData } = useReadContract({
+    address: lockerData as Address | undefined,
+    abi: potatoV4FeeLockerAbi,
+    functionName: "positions",
+    args: lpTokenId !== undefined ? [lpTokenId] : undefined,
+    query: { enabled: isV4 && !!lockerData && lpTokenId !== undefined },
   });
 
   const locker = lockerData as Address | undefined;
   const npm = npmData as Address | undefined;
-  const token0 = token0Data as Address | undefined;
+  const token0 = isV4
+    ? (v4PositionData as readonly [Address, Address, Address] | undefined)?.[1]
+    : (token0Data as Address | undefined);
+  const token1 = isV4
+    ? (v4PositionData as readonly [Address, Address, Address] | undefined)?.[2]
+    : undefined;
 
   const enabled =
     !!client &&
@@ -609,17 +627,28 @@ export function useAccruedFees(
     lpTokenId > 0n &&
     !!locker &&
     locker !== ZERO_ADDRESS &&
-    !!npm &&
-    npm !== ZERO_ADDRESS;
+    (isV4
+      ? !!v4PositionData
+      : !!npm && npm !== ZERO_ADDRESS);
 
   const query = useQuery<readonly [bigint, bigint] | null>({
-    queryKey: ["accrued-fees", chainId, npm, locker, lpTokenId?.toString()],
+    queryKey: ["accrued-fees", chainId, isV4, npm, locker, lpTokenId?.toString()],
     enabled,
     staleTime: 15_000,
     refetchInterval: 15_000,
     queryFn: async () => {
-      if (!client || !npm || !locker || lpTokenId === undefined) return null;
+      if (!client || !locker || lpTokenId === undefined) return null;
       try {
+        if (isV4) {
+          const { result } = await client.simulateContract({
+            address: locker,
+            abi: potatoV4FeeLockerAbi,
+            functionName: "collect",
+            args: [lpTokenId],
+          });
+          return result as readonly [bigint, bigint];
+        }
+        if (!npm) return null;
         const { result } = await client.simulateContract({
           address: npm,
           abi: npmCollectAbi,
@@ -632,7 +661,7 @@ export function useAccruedFees(
               amount1Max: MAX_UINT128,
             },
           ],
-          account: locker, // impersonate the owner so the poke+collect simulates
+          account: locker,
         });
         return result as readonly [bigint, bigint];
       } catch {
@@ -654,7 +683,7 @@ export function useAccruedFees(
       return {
         wethAmount: undefined,
         tokenAmount: undefined,
-        isLoading: enabled && (query.isLoading || token0 === undefined),
+        isLoading: enabled && (query.isLoading || token0 === undefined || (isV4 && token1 === undefined)),
         unavailable: !enabled || query.data === null,
       };
     }
@@ -666,5 +695,5 @@ export function useAccruedFees(
       isLoading: false,
       unavailable: false,
     };
-  }, [query.data, query.isLoading, enabled, token0, weth]);
+  }, [query.data, query.isLoading, enabled, token0, token1, weth, isV4]);
 }
