@@ -140,7 +140,6 @@ contract PotatoV4Pad is ReentrancyGuard {
         bytes32 salt,
         uint24 fee
     ) external payable nonReentrant returns (address token) {
-        if (msg.value == 0) revert InitialLiquidityRequired();
         int24 tickSpacing = tickSpacingForFee(fee);
         if (banned[_normHashCalldata(name)] || banned[_normHashCalldata(symbol)]) {
             revert BannedName();
@@ -172,7 +171,7 @@ contract PotatoV4Pad is ReentrancyGuard {
         // range deliberately excluded one side of the price, which produced a
         // position with zero active liquidity in the live PoolManager.
         int24 center = tokenIs0 ? floor : -floor;
-        int24 width = 200_000;
+        int24 width = tickSpacing * 3_000;
         int24 lower = center - width;
         int24 upper = center + width;
         if (lower < minTick) lower = minTick;
@@ -189,6 +188,7 @@ contract PotatoV4Pad is ReentrancyGuard {
             hooks: address(0)
         });
         poolManager.initialize(key, sqrtPrice);
+        if (msg.value == 0) revert InitialLiquidityRequired();
 
         uint160 sqrtLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 sqrtUpper = TickMath.getSqrtRatioAtTick(upper);

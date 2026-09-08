@@ -164,8 +164,8 @@ export const CHAINS: ChainConfig[] = [
     // Canonical live deployment. Keep this pinned so a stale Railway variable
     // cannot route launches back to the previous pad whose token1 range was
     // outside the initial price and therefore had zero active liquidity.
-    v4PadAddress: "0x4b8485A9695ECE0eeE4C290971Ea5f305D56dFB8",
-    v4PadStartBlock: 57617894n,
+    v4PadAddress: "0xe231f68A59d991E889Daa48061efEdb422C2CFd5",
+    v4PadStartBlock: 57635289n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
@@ -180,6 +180,12 @@ export const CHAINS: ChainConfig[] = [
     legacyPads: [
       // Previous active V4 pad. Keep its launches discoverable after switching
       // new launches to the ETH-backed initial-liquidity deployment.
+      {
+        address: "0x4b8485A9695ECE0eeE4C290971Ea5f305D56dFB8",
+        startBlock: 57617894n,
+        endBlock: 57635288n,
+        kind: "v4",
+      },
       {
         address: "0xd26Fa49ebC12e5aA24f7893dEf5A95d129C70014",
         startBlock: 57606053n,
