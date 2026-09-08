@@ -4,6 +4,10 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+const deployerKey = process.env.DEPLOYER_PRIVATE_KEY?.trim();
+const normalizedDeployerKey =
+  deployerKey && (deployerKey.startsWith("0x") ? deployerKey : `0x${deployerKey}`);
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.24",
@@ -20,7 +24,7 @@ const config: HardhatUserConfig = {
     },
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      accounts: normalizedDeployerKey ? [normalizedDeployerKey] : [],
     },
     // Robinhood Chain mainnet (Arbitrum Orbit L2, chainId 4663). Uniswap V3 is
     // live here at non-canonical addresses; see scripts/deploy.ts CANONICAL map.
@@ -28,7 +32,7 @@ const config: HardhatUserConfig = {
     robinhoodMainnet: {
       url: process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
       chainId: 4663,
-      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      accounts: normalizedDeployerKey ? [normalizedDeployerKey] : [],
     },
     // Robinhood Chain TESTNET (chainId 46630). NOTE: there is no canonical Uniswap
     // V3 deployment here, and no script in scripts/ currently provisions one, so a
@@ -37,7 +41,7 @@ const config: HardhatUserConfig = {
     robinhoodTestnet: {
       url: process.env.ROBINHOOD_TESTNET_RPC_URL || "https://rpc.testnet.chain.robinhood.com",
       chainId: 46630,
-      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      accounts: normalizedDeployerKey ? [normalizedDeployerKey] : [],
     },
   },
   etherscan: {
