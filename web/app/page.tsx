@@ -282,7 +282,7 @@ export default function DiscoverPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tokens"
-          className="w-full rounded-full border border-neutral-800 bg-neutral-900 py-3.5 pl-11 pr-4 text-sm text-neutral-100 shadow-sm outline-none placeholder:text-neutral-500 focus:border-neutral-700 focus:ring-4 focus:ring-white/5"
+          className="w-full rounded-full border border-neutral-200 bg-white py-3.5 pl-11 pr-4 text-sm text-neutral-900 shadow-sm outline-none placeholder:text-neutral-400 focus:border-neutral-300 focus:ring-4 focus:ring-neutral-900/5"
         />
       </div>
 
