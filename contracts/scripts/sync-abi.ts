@@ -17,6 +17,7 @@ const BLOCKS: Record<string, string> = {
   potatoTokenAbi: "PotatoToken",
   potatoRewardTokenAbi: "PotatoRewardToken",
   potatoFeeLockerAbi: "PotatoFeeLocker",
+  potatoV4FeeLockerAbi: "PotatoV4FeeLocker",
   potatoV4PadAbi: "PotatoV4Pad",
 };
 
