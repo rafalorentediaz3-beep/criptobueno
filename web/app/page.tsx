@@ -313,11 +313,11 @@ export default function DiscoverPage() {
                   type="button"
                   onClick={() => setSort(s.id)}
                   className={`rounded-full px-3.5 py-2 text-[11px] transition-all ${
-                  sort === s.id ? "bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] text-[#3a2100] shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)]" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
+                  sort === s.id ? "bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)]" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
                   }`}
                 >
                   {s.id === "recent" && (
-                    <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${sort === s.id ? "bg-[#3a2100]" : "bg-amber-500"}`} />
+                    <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${sort === s.id ? "bg-white" : "bg-amber-500"}`} />
                   )}
                   {s.label}
                 </button>
@@ -352,7 +352,7 @@ export default function DiscoverPage() {
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
               {isAncientTab ? "Ancient Heritage" : "Growing"}
-              <span className="ml-2 inline-flex rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-[#3a2100] shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_10px_-6px_rgba(180,108,0,0.9)]">
+              <span className="ml-2 inline-flex rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_10px_-6px_rgba(180,108,0,0.9)]">
                 {activeRows.length}
               </span>
             </h1>
