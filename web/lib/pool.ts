@@ -5,11 +5,11 @@
 // slot0 / liquidity and the ERC-20 WETH balance held by the pool.
 
 import { useMemo } from "react";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 import { useQuery } from "@tanstack/react-query";
 import { useChainId, usePublicClient, useReadContract, useReadContracts } from "wagmi";
 import { potatoCurvePadAbi, potatoPadAbi } from "@/lib/abi";
-import { CURVE_PAD_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
+import { CURVE_PAD_ADDRESSES, V4_POOL_MANAGER_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
 import { usePad } from "@/lib/hooks";
 
 /** Fixed launch supply: 1 billion whole tokens (18 decimals). */
@@ -61,6 +61,28 @@ export const uniswapV3PoolAbi = [
     inputs: [],
     name: "fee",
     outputs: [{ internalType: "uint24", name: "", type: "uint24" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+const uniswapV4PoolManagerAbi = [
+  {
+    inputs: [{ internalType: "bytes32", name: "id", type: "bytes32" }],
+    name: "getSlot0",
+    outputs: [
+      { internalType: "uint160", name: "sqrtPriceX96", type: "uint160" },
+      { internalType: "int24", name: "tick", type: "int24" },
+      { internalType: "uint24", name: "protocolFee", type: "uint24" },
+      { internalType: "uint24", name: "lpFee", type: "uint24" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "bytes32", name: "id", type: "bytes32" }],
+    name: "getLiquidity",
+    outputs: [{ internalType: "uint128", name: "liquidity", type: "uint128" }],
     stateMutability: "view",
     type: "function",
   },
@@ -302,16 +324,29 @@ const ZERO_STATS: PoolStats = {
  * WETH balance and derives price + market cap. Degrades to zeros when the pool
  * address is missing or a read fails.
  */
-export function usePoolStats(token: Address | undefined, pool: Address | undefined): PoolStats {
+export function usePoolStats(
+  token: Address | undefined,
+  pool: Address | undefined,
+  v4PoolId?: Hex,
+): PoolStats {
   const { weth } = usePad();
-  const enabled = !!pool && pool !== "0x0000000000000000000000000000000000000000" && !!token;
+  const chainId = useChainId();
+  const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
+  const isV4 = !!v4PoolId && v4Manager !== ZERO_ADDRESS;
+  const enabled =
+    !!token &&
+    (isV4 || (!!pool && pool !== "0x0000000000000000000000000000000000000000"));
 
   const { data, isLoading, isError } = useReadContracts({
     allowFailure: true,
     contracts: [
-      { address: pool, abi: uniswapV3PoolAbi, functionName: "slot0" },
-      { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
-      { address: weth, abi: erc20BalanceAbi, functionName: "balanceOf", args: [pool ?? weth] },
+      isV4
+        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "getSlot0", args: [v4PoolId!] }
+        : { address: pool, abi: uniswapV3PoolAbi, functionName: "slot0" },
+      isV4
+        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "getLiquidity", args: [v4PoolId!] }
+        : { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
+      { address: weth, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? weth] },
     ],
     query: { enabled },
   });
