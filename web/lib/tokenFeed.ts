@@ -218,6 +218,24 @@ async function scan(): Promise<FeedPayload> {
 
   let unavailable = false;
 
+  // Active pads are the important path for new launches. Scan them before the
+  // large immutable legacy history so a slow old-pad RPC request cannot delay
+  // the current V4 launch beyond the API/proxy timeout.
+  const activeRound: PadTag[] = [];
+  {
+    const activeResults = await Promise.all(
+      activePads.map((p) => scanPadRange(p.address, p.startBlock, latest)),
+    );
+    let failed = 0;
+    let total = 0;
+    for (const r of activeResults) {
+      activeRound.push(...r.tagged);
+      failed += r.failed;
+      total += r.total;
+    }
+    if (total > 0 && failed / total > MAX_FAILED_FRACTION) unavailable = true;
+  }
+
   // Legacy history: scan once, reuse forever. Lock the cache in only if it came
   // back near-complete, otherwise use this round's result but retry next time.
   let legacyRound: PadTag[];
@@ -241,22 +259,6 @@ async function scan(): Promise<FeedPayload> {
     // A legacy pad can be temporarily rate-limited without making a newly
     // deployed active pad invisible. Keep the successful active-pad logs from
     // this scan; retry the legacy history on the next request instead.
-  }
-
-  // Active pad(s): always fresh.
-  const activeRound: PadTag[] = [];
-  {
-    const activeResults = await Promise.all(
-      activePads.map((p) => scanPadRange(p.address, p.startBlock, latest)),
-    );
-    let failed = 0;
-    let total = 0;
-    for (const r of activeResults) {
-      activeRound.push(...r.tagged);
-      failed += r.failed;
-      total += r.total;
-    }
-    if (total > 0 && failed / total > MAX_FAILED_FRACTION) unavailable = true;
   }
 
   const tagged = [...legacyRound, ...activeRound];
