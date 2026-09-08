@@ -5,6 +5,7 @@
 // slot0 / liquidity and the ERC-20 WETH balance held by the pool.
 
 import { useMemo } from "react";
+import { encodePacked, keccak256 } from "viem";
 import type { Address, Hex } from "viem";
 import { useQuery } from "@tanstack/react-query";
 import { useChainId, usePublicClient, useReadContract, useReadContracts } from "wagmi";
@@ -68,25 +69,24 @@ export const uniswapV3PoolAbi = [
 
 const uniswapV4PoolManagerAbi = [
   {
-    inputs: [{ internalType: "bytes32", name: "id", type: "bytes32" }],
-    name: "getSlot0",
-    outputs: [
-      { internalType: "uint160", name: "sqrtPriceX96", type: "uint160" },
-      { internalType: "int24", name: "tick", type: "int24" },
-      { internalType: "uint24", name: "protocolFee", type: "uint24" },
-      { internalType: "uint24", name: "lpFee", type: "uint24" },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ internalType: "bytes32", name: "id", type: "bytes32" }],
-    name: "getLiquidity",
+    inputs: [{ internalType: "bytes32", name: "slot", type: "bytes32" }],
+    name: "extsload",
     outputs: [{ internalType: "uint128", name: "liquidity", type: "uint128" }],
     stateMutability: "view",
     type: "function",
   },
 ] as const;
+
+const V4_POOLS_SLOT = 6n;
+const V4_LIQUIDITY_OFFSET = 3n;
+
+function v4PoolStateSlot(poolId: Hex): Hex {
+  return keccak256(encodePacked(["bytes32", "uint256"], [poolId, V4_POOLS_SLOT]));
+}
+
+function addSlot(slot: Hex, offset: bigint): Hex {
+  return `0x${(BigInt(slot) + offset).toString(16).padStart(64, "0")}` as Hex;
+}
 
 /**
  * Uniswap V3 pool `Swap` event — watched to detect live buys. Kept separate
@@ -333,6 +333,7 @@ export function usePoolStats(
   const chainId = useChainId();
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const isV4 = !!v4PoolId && v4Manager !== ZERO_ADDRESS;
+  const v4StateSlot = v4PoolId ? v4PoolStateSlot(v4PoolId) : undefined;
   const enabled =
     !!token &&
     (isV4 || (!!pool && pool !== "0x0000000000000000000000000000000000000000"));
@@ -341,10 +342,10 @@ export function usePoolStats(
     allowFailure: true,
     contracts: [
       isV4
-        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "getSlot0", args: [v4PoolId!] }
+        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [v4StateSlot!] }
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "slot0" },
       isV4
-        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "getLiquidity", args: [v4PoolId!] }
+        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [addSlot(v4StateSlot!, V4_LIQUIDITY_OFFSET)] }
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
       { address: weth, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? weth] },
     ],
@@ -356,21 +357,28 @@ export function usePoolStats(
     if (isLoading) return { ...ZERO_STATS, isLoading: true, unavailable: false };
     if (!data) return ZERO_STATS;
 
-    const slot0 = data[0]?.result as
-      | readonly [bigint, number, number, number, number, number, boolean]
-      | undefined;
-    const liquidity = data[1]?.result as bigint | undefined;
+    const v4State = data[0]?.result as Hex | undefined;
+    const sqrtPriceX96 = isV4 && v4State ? BigInt(v4State) & ((1n << 160n) - 1n) : undefined;
+    const liquidityWord = data[1]?.result as Hex | undefined;
+    const liquidity = isV4
+      ? liquidityWord
+        ? BigInt(liquidityWord) & ((1n << 128n) - 1n)
+        : undefined
+      : (data[1]?.result as bigint | undefined);
     const wethInPool = data[2]?.result as bigint | undefined;
-    const sqrtPriceX96 = slot0?.[0];
+    const v3Slot0 = !isV4
+      ? (data[0]?.result as readonly [bigint, number, number, number, number, number, boolean] | undefined)
+      : undefined;
+    const effectiveSqrtPrice = isV4 ? sqrtPriceX96 : v3Slot0?.[0];
 
-    if (sqrtPriceX96 === undefined) {
-      return { ...ZERO_STATS, liquidity, wethInPool, unavailable: isError || !slot0 };
+    if (effectiveSqrtPrice === undefined) {
+      return { ...ZERO_STATS, liquidity, wethInPool, unavailable: isError || !effectiveSqrtPrice };
     }
 
     const isToken0 = token ? tokenIsToken0(token, weth) : true;
-    const priceWeth = priceWethPerToken(sqrtPriceX96, isToken0);
+    const priceWeth = priceWethPerToken(effectiveSqrtPrice, isToken0);
     return {
-      sqrtPriceX96,
+      sqrtPriceX96: effectiveSqrtPrice,
       priceWeth,
       marketCapEth: priceWeth * TOTAL_SUPPLY_WHOLE,
       liquidity,
