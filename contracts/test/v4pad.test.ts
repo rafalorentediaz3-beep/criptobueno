@@ -71,15 +71,17 @@ describe("PotatoV4Pad", () => {
     expect(params).to.have.length(4);
   });
 
-  it("allows a launch without an optional creator dev buy", async () => {
+  it("requires an initial ETH contribution for the v4 position", async () => {
     const ctx = await deploy();
-    const token = await ctx.pad.connect(ctx.creator).createToken.staticCall(
-      "V4 No Buy", "V4NB", NO_META, ethers.id("v4-no-buy"), 3_000, { value: 0n }
-    );
-    const tx = await ctx.pad.connect(ctx.creator).createToken(
-      "V4 No Buy", "V4NB", NO_META, ethers.id("v4-no-buy"), 3_000, { value: 0n }
-    );
-    await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
-    expect((await ctx.pad.v4Tokens(token)).positionId).to.equal(0);
+    await expect(
+      ctx.pad.connect(ctx.creator).createToken(
+        "V4 No Buy",
+        "V4NB",
+        NO_META,
+        ethers.id("v4-no-buy"),
+        3_000,
+        { value: 0n },
+      ),
+    ).to.be.revertedWithCustomError(ctx.pad, "InitialLiquidityRequired");
   });
 });

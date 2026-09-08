@@ -4105,6 +4105,11 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
+    "name": "InitialLiquidityRequired",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidConfig",
     "type": "error"
   },

@@ -88,6 +88,7 @@ contract PotatoV4Pad is ReentrancyGuard {
     error LaunchGriefed();
     error BannedName();
     error OnlyOwner();
+    error InitialLiquidityRequired();
     error LiquidityOverflow();
 
     modifier onlyOwner() {
@@ -187,9 +188,8 @@ contract PotatoV4Pad is ReentrancyGuard {
             hooks: address(0)
         });
         poolManager.initialize(key, sqrtPrice);
-        bytes32 poolId = keccak256(abi.encode(key));
-        uint256 positionId;
-        if (msg.value != 0) {
+        if (msg.value == 0) revert InitialLiquidityRequired();
+
         uint160 sqrtLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 sqrtUpper = TickMath.getSqrtRatioAtTick(upper);
         uint256 amount0 = tokenIs0 ? TOTAL_SUPPLY : msg.value;
@@ -230,7 +230,7 @@ contract PotatoV4Pad is ReentrancyGuard {
             IERC20(token).safeTransfer(address(positionManager), TOTAL_SUPPLY);
             IERC20(address(weth)).safeTransfer(address(positionManager), msg.value);
         }
-        positionId = positionManager.nextTokenId();
+        uint256 positionId = positionManager.nextTokenId();
         // A mint leaves the PoolManager with a negative delta for each currency
         // used by the position. SETTLE_PAIR resolves both through Permit2.
         bytes memory actions = hasPermit2
@@ -267,8 +267,8 @@ contract PotatoV4Pad is ReentrancyGuard {
         uint256 leftoverWeth = weth.balanceOf(address(this));
         if (leftoverWeth != 0) IERC20(address(weth)).safeTransfer(treasury, leftoverWeth);
         locker.register(positionId, token, msg.sender, key.currency0, key.currency1);
-        }
 
+        bytes32 poolId = keccak256(abi.encode(key));
         v4Tokens[token] = V4Info(msg.sender, poolId, positionId, fee);
         emit TokenCreated(
             token, msg.sender, name, symbol, address(0), meta.imageURI, meta.website, meta.twitter, meta.telegram
