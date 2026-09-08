@@ -422,6 +422,11 @@ export default function CreatePage() {
         abi: potatoV4PadAbi,
         functionName: "createToken",
         args: [trimmedName, ticker, meta, salt, v4Fee],
+        // A v4 launch initializes the pool and mints the locked position in one
+        // transaction. MetaMask can fail to estimate this call on Robinhood;
+        // an explicit ceiling lets it calculate the fee and still rejects any
+        // execution that exceeds the network block limit.
+        gas: 8_000_000n,
       });
       return;
     }
