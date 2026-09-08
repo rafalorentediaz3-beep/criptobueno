@@ -178,6 +178,14 @@ export const CHAINS: ChainConfig[] = [
     // so its tokens resolve; older direct pads follow in legacyPads.
     padStartBlock: 14_984_800n, // deploy block of the direct pad 0x88bb90…Ca07
     legacyPads: [
+      // Previous V4 pad: keep its successful launches discoverable after
+      // switching writes to the corrected active-liquidity deployment.
+      {
+        address: "0x5c9F690c2A5fA564E76d12D6ebe4900Abaccb61c",
+        startBlock: 57546131n,
+        endBlock: 57592222n,
+        kind: "v4",
+      },
       // v6 direct pad 0x88eB…A338 — first holder-rewards pad, superseded same day by
       // 0x88bb90…Ca07 (which added the locker's one-transaction collectAndClaim).
       { address: "0x88eB8F4aC925C0a6b5501da0eb7E202a036EA338", startBlock: 14_072_000n, endBlock: 14_984_900n },
@@ -364,7 +372,10 @@ export function v4PadDeployment(chainId: number): PadDeployment | undefined {
 export function allPadDeployments(chainId: number): PadDeployment[] {
   const curve = curvePadDeployment(chainId);
   const v4 = v4PadDeployment(chainId);
-  const directs: PadDeployment[] = padDeployments(chainId).map((p) => ({ ...p, kind: "direct" }));
+  const directs: PadDeployment[] = padDeployments(chainId).map((p) => ({
+    ...p,
+    kind: p.kind ?? "direct",
+  }));
   const all: PadDeployment[] = curve ? [curve, ...(v4 ? [v4] : []), ...directs] : (v4 ? [v4, ...directs] : directs);
   const seen = new Set<string>();
   const out: PadDeployment[] = [];
