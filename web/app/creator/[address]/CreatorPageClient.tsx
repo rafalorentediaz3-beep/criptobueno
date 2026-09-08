@@ -316,8 +316,8 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
                   {profile?.username ?? shortAddress(address)}
                 </h1>
                 {isYou && (
-                  <span className="rounded-full border border-lime-500/30 bg-lime-500/15 px-2.5 py-0.5 text-xs font-semibold text-lime-300">
-                    You
+                  <span className="rounded-full border border-amber-400/30 bg-amber-400/15 px-2.5 py-0.5 text-xs font-semibold text-amber-300">
+                    Your profile
                   </span>
                 )}
               </div>
@@ -373,7 +373,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
         )}
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Coins planted" value={String(mine.length)} />
+          <Stat label="Created coins" value={String(mine.length)} />
           <Stat
             label="First plant"
             value={first != null ? shortDate(first) : "—"}
@@ -415,7 +415,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-neutral-300">
-          Coins planted
+          Created coins
           {pricesQuery.isFetching && (
             <span className="ml-2 text-xs font-normal text-neutral-500">updating prices…</span>
           )}

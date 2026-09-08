@@ -1,16 +1,17 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { BarChart3, User, Wallet } from "lucide-react";
+import { LogOut, User, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { getAddress } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
 
 export function Header() {
   const pathname = usePathname();
   const { address: connected } = useAccount();
+  const { disconnect } = useDisconnect();
   // EVERY connected wallet has a profile now (auto-named until claimed, editable
   // there), so this no longer waits on the launch feed or requires having planted
   // a coin — that older gate left non-planters with no way to reach their profile.
@@ -54,7 +55,7 @@ export function Header() {
           </Link>
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-4">
           <Link
             href="/create"
             className={`hidden items-center gap-2 rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-4 py-2 text-sm font-semibold text-[#3a2100] shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)] transition-all hover:brightness-110 sm:flex ${
@@ -75,9 +76,8 @@ export function Header() {
                 <button type="button" onClick={openChainModal} className="rounded-full bg-red-950/60 px-4 py-2 text-sm font-medium text-red-400">Wrong network</button>
               ) : (
                 <div className="flex items-center gap-2">
-                  {myProfileHref && <Link href={myProfileHref} aria-label="My profile" className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-neutral-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-10px_rgba(0,0,0,0.65)] backdrop-blur-xl hover:bg-white/10 sm:flex"><User className="h-4 w-4" /></Link>}
-                  <button type="button" onClick={openChainModal} className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-neutral-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-10px_rgba(0,0,0,0.65)] backdrop-blur-xl hover:bg-white/10 lg:flex"><BarChart3 className="h-4 w-4" /></button>
-                          <button type="button" onClick={openAccountModal} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-2 font-mono text-xs font-medium text-neutral-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-10px_rgba(0,0,0,0.65)] backdrop-blur-xl hover:bg-white/10">{account.displayName}</button>
+                  {myProfileHref && <Link href={myProfileHref} aria-label="My profile" className="hidden items-center justify-center rounded-full px-2 py-2 text-neutral-300 hover:bg-white/10 sm:flex"><User className="h-6 w-6" /></Link>}
+                          <button type="button" onClick={() => disconnect()} aria-label="Disconnect" className="inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-neutral-300 hover:bg-white/10 hover:text-red-400"><LogOut className="h-4 w-4" /></button>
                 </div>
               );
             }}

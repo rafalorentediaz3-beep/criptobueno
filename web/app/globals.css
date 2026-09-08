@@ -8,6 +8,17 @@
   }
 }
 
+/* Glassy RainbowKit modal (wallet connect / account) */
+[data-rk] {
+  --rk-colors-modalBackground: rgba(23, 23, 23, 0.55) !important;
+  --rk-colors-modalBorder: rgba(255, 255, 255, 0.08) !important;
+  --rk-colors-modalBackdrop: rgba(0, 0, 0, 0.5) !important;
+}
+[data-rk] ._9pm4ki5 {
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
 @layer components {
   .card {
     @apply rounded-2xl border border-neutral-800 bg-neutral-900;

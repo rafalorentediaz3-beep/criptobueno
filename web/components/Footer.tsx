@@ -1,57 +1,40 @@
 import Link from "next/link";
-import { Send, ShieldCheck } from "lucide-react";
 import { PROOF_OF_POTATO_URL } from "@/lib/config";
 
 export function Footer() {
   return (
-    <footer className="border-t border-neutral-800 py-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 text-xs text-neutral-500 sm:flex-row sm:px-6">
-        <div className="flex flex-col items-center gap-1 sm:items-start">
-          <p className="flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-amber-500/70" />
-            Potato Pad, open-source MVP, unaudited, demo only.
-          </p>
-          <p>
-            Tokens listed here are created by third parties.{" "}
-            <span className="text-neutral-400">We do not endorse any token.</span>{" "}
-            <Link
-              href="/analytics"
-              className="underline decoration-neutral-700 underline-offset-2 transition-colors hover:text-neutral-200"
-            >
-              Analytics
-            </Link>
-            {" · "}
-            <Link
-              href="/privacy"
-              className="underline decoration-neutral-700 underline-offset-2 transition-colors hover:text-neutral-200"
-            >
-              Privacy
-            </Link>
-            {" · "}
-            <Link
-              href="/terms"
-              className="underline decoration-neutral-700 underline-offset-2 transition-colors hover:text-neutral-200"
-            >
-              Terms &amp; Disclaimers
-            </Link>
-          </p>
-        </div>
-        <div className="flex flex-col items-center gap-1 sm:items-end">
+    <footer className="border-t border-white/5">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-8 text-xs text-neutral-500 sm:flex-row sm:justify-between sm:px-6">
+        <nav className="flex items-center gap-5 text-neutral-500">
+          <Link href="/analytics" className="transition-colors hover:text-neutral-200">
+            Analytics
+          </Link>
+          <Link href="/privacy" className="transition-colors hover:text-neutral-200">
+            Privacy
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-neutral-200">
+            Terms
+          </Link>
+        </nav>
+
+        {/* Attribution required by the project license — keep this credit visible. */}
+        <div className="flex items-center gap-4">
           <a
-            href="https://t.me/potatopad"
+            href="https://x.com/onchainscam"
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-neutral-200"
+            aria-label="Follow on X"
+            className="transition-colors hover:text-neutral-200"
           >
-            <Send className="h-3.5 w-3.5 text-amber-500/70" />
-            Community Telegram
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
           </a>
-          {/* Attribution required by the project license — keep this credit visible. */}
           <a
             href={PROOF_OF_POTATO_URL}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-amber-500/90 transition-colors hover:text-amber-400"
+            className="font-medium text-amber-500/80 transition-colors hover:text-amber-400"
           >
             Made by proofofpotato.com
           </a>
@@ -60,3 +43,4 @@ export function Footer() {
     </footer>
   );
 }
+

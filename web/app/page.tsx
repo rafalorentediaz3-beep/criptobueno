@@ -35,10 +35,9 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "ancient", label: "Ancients" },
 ];
 const SORTS: { id: SortId; label: string }[] = [
-  { id: "recent", label: "Recent buys" },
+  { id: "mcap", label: "Market Cap" },
   { id: "new", label: "Newest" },
   { id: "old", label: "Oldest" },
-  { id: "mcap", label: "Market Cap" },
 ];
 
 type Slot0 = readonly [bigint, number, number, number, number, number, boolean];
@@ -61,7 +60,7 @@ export default function DiscoverPage() {
   const { chainId, curvePad, isDeployed } = usePad();
   const { query, setQuery } = useSearch();
   const [tab, setTab] = useState<TabId>("growing");
-  const [sort, setSort] = useState<SortId>("recent");
+  const [sort, setSort] = useState<SortId>("mcap");
   const isAncientTab = tab === "ancient";
 
   // PotatoPad launches — span ALL pads (curve + direct/legacy). Robinhood-pinned.
@@ -275,36 +274,20 @@ export default function DiscoverPage() {
     <div className="space-y-6">
       {/* Unified header + controls */}
       <div className="relative hidden md:block">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-600" />
         <input
           type="search"
           aria-label="Search coins by name or symbol"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tokens"
-          className="w-full rounded-full border border-white/70 bg-white/60 py-3.5 pl-11 pr-4 text-sm text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] outline-none backdrop-blur-xl placeholder:text-neutral-400 focus:border-white focus:ring-4 focus:ring-white/20"
+          style={{ colorScheme: "light" }}
+          className="relative w-full appearance-none rounded-full border border-white/70 bg-white/60 py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] outline-none backdrop-blur-xl placeholder:font-semibold placeholder:text-neutral-600 focus:border-white focus:ring-4 focus:ring-white/20"
         />
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-18px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`${segBase} ${
-                  tab === t.id
-                    ? "bg-neutral-800 text-neutral-100 shadow-[0_5px_14px_-8px_rgba(0,0,0,0.8)]"
-                    : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
           {!isAncientTab && (
             <div className="flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-18px_rgba(0,0,0,0.6)] backdrop-blur-xl">
               {SORTS.map((s) => (
@@ -352,13 +335,16 @@ export default function DiscoverPage() {
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
               {isAncientTab ? "Ancient Heritage" : "Growing"}
-              <span className="ml-2 inline-flex rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_10px_-6px_rgba(180,108,0,0.9)]">
+              <span
+                suppressHydrationWarning
+                className="ml-2 inline-flex rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_10px_-6px_rgba(180,108,0,0.9)]"
+              >
                 {activeRows.length}
               </span>
             </h1>
-            <p className="mt-2 text-sm text-neutral-500">
-              {isAncientTab ? "Verified legacy runners from Robinhood." : "Tokens still climbing toward graduation on Robinhood Chain."}
-            </p>
+            {isAncientTab && (
+              <p className="mt-2 text-sm text-neutral-500">Verified legacy runners from Robinhood.</p>
+            )}
           </div>
           <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-neutral-800 px-4 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-neutral-700 sm:inline-flex">
             <span className="text-lg leading-none">+</span> Create
