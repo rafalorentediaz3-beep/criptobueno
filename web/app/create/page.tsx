@@ -265,7 +265,7 @@ export default function CreatePage() {
     !vampBlocked &&
     devBuyWei !== undefined &&
     !devBuyTooLarge &&
-    (isV4 ? canV4Launch : canLaunch);
+    (isV4 ? canV4Launch && devBuyWei > 0n : canLaunch);
 
   useEffect(() => {
     if (!tx.confirmed || !tx.receipt) return;
@@ -384,6 +384,8 @@ export default function CreatePage() {
         showLaunchWarning("Add a token image before launching.");
       } else if (devBuyWei === undefined || devBuyTooLarge) {
         showLaunchWarning("Adjust the dev buy amount before launching.");
+      } else if (isV4 && devBuyWei === 0n) {
+        showLaunchWarning("Add initial liquidity greater than 0 ETH before launching.");
       } else {
         showLaunchWarning("Complete the required fields before launching.");
       }
@@ -738,7 +740,7 @@ export default function CreatePage() {
                 <input
                   id="devbuy"
                   className={`${inputCls} font-mono tabular-nums`}
-                  placeholder="0.00"
+                  placeholder={isV4 ? "0.01" : "0.00"}
                   inputMode="decimal"
                   value={devBuy}
                   onChange={(e) => setDevBuy(e.target.value)}
@@ -746,6 +748,11 @@ export default function CreatePage() {
                 {isV4 && (
                   <p className="text-xs text-neutral-600">
                     This ETH is wrapped and added to the initial Uniswap v4 liquidity.
+                  </p>
+                )}
+                {isV4 && devBuyWei === 0n && (
+                  <p className="text-xs text-amber-700">
+                    Enter an amount greater than 0 ETH. A V4 pool cannot be created without initial liquidity.
                   </p>
                 )}
                 {devBuy.trim() !== "" && devBuyWei === undefined && (
@@ -794,7 +801,7 @@ export default function CreatePage() {
                     >
                       <span className="block text-xs font-bold text-neutral-900">Uniswap v4</span>
                       <span className="mt-0.5 block text-[10px] leading-tight text-neutral-500">
-                        Locked single-sided liquidity.
+                        Locked initial liquidity.
                       </span>
                     </button>
                   </div>
