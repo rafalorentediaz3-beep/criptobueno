@@ -10,7 +10,7 @@ describe("PotatoV4Pad", () => {
     const poolManager = await (await ethers.getContractFactory("MockV4PoolManager")).deploy();
     const positionManager = await (
       await ethers.getContractFactory("MockV4PositionManager")
-    ).deploy();
+    ).deploy(poolManager.target);
     const weth = await (await ethers.getContractFactory("WETH9")).deploy();
     const pad = await (
       await ethers.getContractFactory("PotatoV4Pad")
@@ -71,17 +71,37 @@ describe("PotatoV4Pad", () => {
     expect(params).to.have.length(4);
   });
 
-  it("requires an initial ETH contribution for the v4 position", async () => {
+  it("launches a token with zero ETH — the dev buy is optional", async () => {
     const ctx = await deploy();
-    await expect(
-      ctx.pad.connect(ctx.creator).createToken(
-        "V4 No Buy",
-        "V4NB",
-        NO_META,
-        ethers.id("v4-no-buy"),
-        3_000,
-        { value: 0n },
-      ),
-    ).to.be.revertedWithCustomError(ctx.pad, "InitialLiquidityRequired");
+    const salt = ethers.id("v4-no-buy");
+    const tx = await ctx.pad.connect(ctx.creator).createToken(
+      "V4 No Buy",
+      "V4NB",
+      NO_META,
+      salt,
+      3_000,
+      { value: 0n },
+    );
+    await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
+    await expect(tx).to.not.emit(ctx.pad, "DevBuy");
+  });
+
+  it("runs an optional dev buy when ETH is sent, crediting the buyer", async () => {
+    const ctx = await deploy();
+    const salt = ethers.id("v4-dev-buy");
+    const token = await ctx.pad.connect(ctx.creator).createToken.staticCall(
+      "V4 Dev Buy",
+      "V4DB",
+      NO_META,
+      salt,
+      500,
+      { value: E / 10n },
+    );
+    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Dev Buy", "V4DB", NO_META, salt, 500, {
+      value: E / 10n,
+    });
+    await expect(tx).to.emit(ctx.pad, "DevBuy");
+    const erc20 = await ethers.getContractAt("PotatoToken", token);
+    expect(await erc20.balanceOf(ctx.creator.address)).to.equal(E / 10n);
   });
 });

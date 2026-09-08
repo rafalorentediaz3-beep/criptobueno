@@ -81,6 +81,7 @@ contract PotatoV4Pad is ReentrancyGuard {
         uint256 positionId
     );
     event BannedSet(bytes32 indexed wordHash, bool banned);
+    event DevBuy(address indexed token, address indexed buyer, uint256 wethSpent, uint256 tokensOut);
 
     error InvalidConfig();
     error InvalidFee();
@@ -88,8 +89,10 @@ contract PotatoV4Pad is ReentrancyGuard {
     error LaunchGriefed();
     error BannedName();
     error OnlyOwner();
-    error InitialLiquidityRequired();
     error LiquidityOverflow();
+    error OnlyPoolManager();
+    error DevBuyExceedsCap();
+    error EthTransferFailed();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
@@ -129,10 +132,13 @@ contract PotatoV4Pad is ReentrancyGuard {
         }
     }
 
-    /// @notice Launches a fixed-supply v4 position using msg.value as the
-    /// initial WETH side of the pool. Supported
-    /// trading fees are 0.01%, 0.05%, 0.30%, and 1.00%.
-    /// @dev msg.value is the initial WETH contribution, not a separate swap.
+    /// @notice Launches a fixed-supply v4 position. The initial LP position is
+    /// always single-sided (100% token, zero WETH), so a token can always be
+    /// launched with no ETH. Supported trading fees are 0.01%, 0.05%, 0.30%,
+    /// and 1.00%.
+    /// @dev msg.value is an OPTIONAL dev buy: if non-zero, it is swapped for
+    /// the freshly-seeded token right after the position is minted, exactly
+    /// like the v3 curve pad's dev buy. It is never required to launch.
     function createToken(
         string calldata name,
         string calldata symbol,
@@ -167,17 +173,15 @@ contract PotatoV4Pad is ReentrancyGuard {
         );
         int24 minTick = (TickMath.MIN_TICK / tickSpacing) * tickSpacing;
         int24 maxTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
-        // Use a bounded range around the opening price. The old single-sided
-        // range deliberately excluded one side of the price, which produced a
-        // position with zero active liquidity in the live PoolManager.
-        int24 center = tokenIs0 ? floor : -floor;
-        int24 width = tickSpacing * 3_000;
-        int24 lower = center - width;
-        int24 upper = center + width;
-        if (lower < minTick) lower = minTick;
-        if (upper > maxTick) upper = maxTick;
-        if (lower >= center) lower = center - tickSpacing;
-        if (upper <= center) upper = center + tickSpacing;
+        // Single-sided range, same shape as the v3 curve pad's `_rangeFor`:
+        // the position covers the opening tick through the far edge of the
+        // tick space, seeded entirely from the token side. The current price
+        // sits exactly at the near edge of the range (`center`), so the
+        // position never needs any WETH to mint — a dev buy is a separate,
+        // optional swap executed after the mint below.
+        int24 lower = tokenIs0 ? floor : minTick;
+        int24 upper = tokenIs0 ? maxTick : -floor;
+        int24 center = tokenIs0 ? lower : upper;
         uint160 sqrtPrice = TickMath.getSqrtRatioAtTick(center);
 
         IUniswapV4PoolManager.PoolKey memory key = IUniswapV4PoolManager.PoolKey({
@@ -188,28 +192,18 @@ contract PotatoV4Pad is ReentrancyGuard {
             hooks: address(0)
         });
         poolManager.initialize(key, sqrtPrice);
-        if (msg.value == 0) revert InitialLiquidityRequired();
 
         uint160 sqrtLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 sqrtUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint256 amount0 = tokenIs0 ? TOTAL_SUPPLY : msg.value;
-        uint256 amount1 = tokenIs0 ? msg.value : TOTAL_SUPPLY;
-        uint256 liquidityFrom0 = Math.mulDiv(
-            amount0,
-            Math.mulDiv(sqrtPrice, sqrtUpper, Q96),
-            uint256(sqrtUpper) - sqrtPrice
-        );
-        uint256 liquidityFrom1 = Math.mulDiv(
-            amount1,
-            Q96,
-            uint256(sqrtPrice) - sqrtLower
-        );
-        uint256 liquidity = liquidityFrom0 < liquidityFrom1 ? liquidityFrom0 : liquidityFrom1;
+        // The current price equals sqrtLower (tokenIs0) or sqrtUpper
+        // (!tokenIs0), so only ONE side of the standard liquidity formula is
+        // needed — the other side's required amount is exactly zero.
+        uint256 liquidity = tokenIs0
+            ? Math.mulDiv(
+                TOTAL_SUPPLY, Math.mulDiv(sqrtLower, sqrtUpper, Q96), uint256(sqrtUpper) - sqrtLower
+            )
+            : Math.mulDiv(TOTAL_SUPPLY, Q96, uint256(sqrtUpper) - sqrtLower);
         if (liquidity == 0 || liquidity > type(uint128).max) revert LiquidityOverflow();
-
-        // The launch ETH is the WETH side of the initial position. It remains
-        // in the pool and is not treated as a separate creator buy.
-        IWETH9V4(address(weth)).deposit{value: msg.value}();
 
         // Authorize the PositionManager to pull the freshly minted supply through
         // Permit2. This is the standard v4 settlement path used by Robinhood's
@@ -220,19 +214,16 @@ contract PotatoV4Pad is ReentrancyGuard {
             IPermit2Approval(permit2).approve(
                 token, address(positionManager), type(uint160).max, type(uint48).max
             );
-            IERC20(address(weth)).approve(permit2, type(uint256).max);
-            IPermit2Approval(permit2).approve(
-                address(weth), address(positionManager), type(uint160).max, type(uint48).max
-            );
         } else {
             // Local test doubles do not deploy Permit2; retain their pre-funded
             // settlement path without weakening the live Robinhood path.
             IERC20(token).safeTransfer(address(positionManager), TOTAL_SUPPLY);
-            IERC20(address(weth)).safeTransfer(address(positionManager), msg.value);
         }
         uint256 positionId = positionManager.nextTokenId();
-        // A mint leaves the PoolManager with a negative delta for each currency
-        // used by the position. SETTLE_PAIR resolves both through Permit2.
+        // A mint leaves the PoolManager with a negative delta for the token
+        // side only (the WETH side is zero for this single-sided position).
+        // SETTLE_PAIR/SETTLE still resolve both currencies; settling zero for
+        // WETH is a no-op.
         bytes memory actions = hasPermit2
             ? abi.encodePacked(bytes1(uint8(0x02)), bytes1(uint8(0x0d)), bytes1(uint8(0x14)))
             : abi.encodePacked(bytes1(uint8(0x02)), bytes1(uint8(0x0b)), bytes1(uint8(0x0b)), bytes1(uint8(0x14)));
@@ -264,8 +255,6 @@ contract PotatoV4Pad is ReentrancyGuard {
         positionManager.modifyLiquidities(abi.encode(actions, params), block.timestamp);
         uint256 leftoverToken = IERC20(token).balanceOf(address(this));
         if (leftoverToken != 0) IERC20(token).safeTransfer(DEAD, leftoverToken);
-        uint256 leftoverWeth = weth.balanceOf(address(this));
-        if (leftoverWeth != 0) IERC20(address(weth)).safeTransfer(treasury, leftoverWeth);
         locker.register(positionId, token, msg.sender, key.currency0, key.currency1);
 
         bytes32 poolId = keccak256(abi.encode(key));
@@ -274,7 +263,117 @@ contract PotatoV4Pad is ReentrancyGuard {
             token, msg.sender, name, symbol, address(0), meta.imageURI, meta.website, meta.twitter, meta.telegram
         );
         emit V4PoolCreated(token, poolId, fee, tickSpacing, positionId);
+
+        // Optional dev buy: only runs if the creator sent ETH. Never blocks
+        // the launch itself.
+        if (msg.value > 0) {
+            _devBuy(token, key, tokenIs0, lower, upper, tickSpacing);
+        }
     }
+
+    /// @dev Swaps `msg.value` ETH for the just-seeded token directly against
+    /// the live PoolManager, mirroring the v3 curve pad's `_devBuy`. Runs
+    /// after the position mint above so the pool already has liquidity to
+    /// fill the swap against. Reverts (refunding nothing) if it fails, which
+    /// only rolls back the dev buy attempt — callers that want a
+    /// launch-cannot-fail guarantee should keep msg.value at 0.
+    function _devBuy(
+        address token,
+        IUniswapV4PoolManager.PoolKey memory key,
+        bool tokenIs0,
+        int24 lower,
+        int24 upper,
+        int24 tickSpacing
+    ) internal {
+        IWETH9V4(address(weth)).deposit{value: msg.value}();
+        bool zeroForOne = !tokenIs0;
+        // Cap the swap one tick-spacing short of the seeded range's far edge
+        // so it can never touch TickMath's absolute min/max sqrt ratio.
+        uint160 sqrtPriceLimitX96 = tokenIs0
+            ? TickMath.getSqrtRatioAtTick(upper - tickSpacing)
+            : TickMath.getSqrtRatioAtTick(lower + tickSpacing);
+
+        poolManager.unlock(
+            abi.encode(key, zeroForOne, msg.value, sqrtPriceLimitX96, token, msg.sender)
+        );
+    }
+
+    /// @notice PoolManager callback for the dev-buy swap kicked off by
+    /// `_devBuy`. Not reentrant-guarded on its own because it only ever runs
+    /// nested inside `createToken`, which already holds the guard.
+    function unlockCallback(bytes calldata data) external returns (bytes memory) {
+        if (msg.sender != address(poolManager)) revert OnlyPoolManager();
+        (
+            IUniswapV4PoolManager.PoolKey memory key,
+            bool zeroForOne,
+            uint256 wethIn,
+            uint160 sqrtPriceLimitX96,
+            address token,
+            address buyer
+        ) = abi.decode(
+            data, (IUniswapV4PoolManager.PoolKey, bool, uint256, uint160, address, address)
+        );
+
+        int256 delta = poolManager.swap(
+            key,
+            IUniswapV4PoolManager.SwapParams({
+                zeroForOne: zeroForOne,
+                amountSpecified: -int256(wethIn),
+                sqrtPriceLimitX96: sqrtPriceLimitX96
+            }),
+            bytes("")
+        );
+        int128 delta0 = _deltaAmount0(delta);
+        int128 delta1 = _deltaAmount1(delta);
+        bool tokenIs0 = !zeroForOne;
+        int128 wethDelta = tokenIs0 ? delta1 : delta0;
+        int128 tokenDelta = tokenIs0 ? delta0 : delta1;
+
+        uint256 wethSpent = wethDelta < 0 ? uint256(uint128(-wethDelta)) : 0;
+        uint256 tokensOut = tokenDelta > 0 ? uint256(uint128(tokenDelta)) : 0;
+
+        if (
+            block.number <= PotatoToken(token).antiSnipeDeadlineBlock()
+                && tokensOut > MAX_WALLET
+        ) revert DevBuyExceedsCap();
+
+        if (wethSpent != 0) {
+            address wethCurrency = tokenIs0 ? key.currency1 : key.currency0;
+            poolManager.sync(wethCurrency);
+            IERC20(address(weth)).safeTransfer(address(poolManager), wethSpent);
+            poolManager.settle();
+        }
+        if (tokensOut != 0) {
+            poolManager.take(token, buyer, tokensOut);
+        }
+        emit DevBuy(token, buyer, wethSpent, tokensOut);
+
+        uint256 refund = wethIn - wethSpent;
+        if (refund != 0) {
+            IWETH9V4(address(weth)).withdraw(refund);
+            (bool ok,) = buyer.call{value: refund}("");
+            if (!ok) revert EthTransferFailed();
+        }
+        return bytes("");
+    }
+
+    /// @dev Unpacks the high 128 bits of a packed v4 `BalanceDelta`.
+    function _deltaAmount0(int256 delta) private pure returns (int128 amount0) {
+        assembly ("memory-safe") {
+            amount0 := sar(128, delta)
+        }
+    }
+
+    /// @dev Unpacks the low 128 bits of a packed v4 `BalanceDelta`.
+    function _deltaAmount1(int256 delta) private pure returns (int128 amount1) {
+        assembly ("memory-safe") {
+            amount1 := signextend(15, delta)
+        }
+    }
+
+    /// @notice Allows this contract to receive ETH refunds when unwrapping
+    /// WETH during an unspent dev-buy refund.
+    receive() external payable {}
 
     function tickSpacingForFee(uint24 fee) public pure returns (int24) {
         if (fee == 100) return 1; // 0.01%

@@ -4105,7 +4105,12 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
-    "name": "InitialLiquidityRequired",
+    "name": "DevBuyExceedsCap",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EthTransferFailed",
     "type": "error"
   },
   {
@@ -4136,6 +4141,11 @@ export const potatoV4PadAbi = [
   {
     "inputs": [],
     "name": "OnlyOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OnlyPoolManager",
     "type": "error"
   },
   {
@@ -4171,6 +4181,37 @@ export const potatoV4PadAbi = [
       }
     ],
     "name": "BannedSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "buyer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "wethSpent",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "tokensOut",
+        "type": "uint256"
+      }
+    ],
+    "name": "DevBuy",
     "type": "event"
   },
   {
@@ -4547,6 +4588,25 @@ export const potatoV4PadAbi = [
   {
     "inputs": [
       {
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
+      }
+    ],
+    "name": "unlockCallback",
+    "outputs": [
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "",
         "type": "address"
@@ -4590,5 +4650,9 @@ export const potatoV4PadAbi = [
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "stateMutability": "payable",
+    "type": "receive"
   }
 ] as const;

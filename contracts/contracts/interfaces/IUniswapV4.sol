@@ -13,7 +13,30 @@ interface IUniswapV4PoolManager {
         address hooks;
     }
 
+    /// @dev Mirrors Uniswap v4-core's `SwapParams`. `amountSpecified` negative
+    /// means exact input, positive means exact output.
+    struct SwapParams {
+        bool zeroForOne;
+        int256 amountSpecified;
+        uint160 sqrtPriceLimitX96;
+    }
+
     function initialize(PoolKey calldata key, uint160 sqrtPriceX96) external returns (int24 tick);
+
+    /// @dev Returns a packed `BalanceDelta` (int256: high 128 bits = amount0,
+    /// low 128 bits = amount1). Declared as a plain `int256` here so this
+    /// local interface doesn't need the v4-core `BalanceDelta` user type.
+    function swap(PoolKey memory key, SwapParams memory params, bytes calldata hookData)
+        external
+        returns (int256 delta);
+
+    function unlock(bytes calldata data) external returns (bytes memory);
+
+    function sync(address currency) external;
+
+    function settle() external payable returns (uint256 paid);
+
+    function take(address currency, address to, uint256 amount) external;
 }
 
 interface IUniswapV4PositionManager {

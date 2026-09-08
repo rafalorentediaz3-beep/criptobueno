@@ -162,10 +162,12 @@ export const CHAINS: ChainConfig[] = [
     curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_ROBINHOOD,
     curvePadStartBlock: 14_984_900n, // PotatoCurvePad 0x94085E…6069 (~$2.5k open / $44k bond, holder rewards) deploy block 14984902
     // Canonical live deployment. Keep this pinned so a stale Railway variable
-    // cannot route launches back to the previous pad whose token1 range was
-    // outside the initial price and therefore had zero active liquidity.
-    v4PadAddress: "0xe231f68A59d991E889Daa48061efEdb422C2CFd5",
-    v4PadStartBlock: 57635289n,
+    // cannot route launches back to a previous pad.
+    // Optional-dev-buy deployment: the initial LP position is always
+    // single-sided (100% token, zero WETH) so a launch never requires ETH;
+    // any ETH sent is an optional post-mint dev buy swapped against the pool.
+    v4PadAddress: "0x8117C8DAD42f969D5106dfd61d6406695b97D774",
+    v4PadStartBlock: 57688519n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
@@ -178,6 +180,15 @@ export const CHAINS: ChainConfig[] = [
     // so its tokens resolve; older direct pads follow in legacyPads.
     padStartBlock: 14_984_800n, // deploy block of the direct pad 0x88bb90…Ca07
     legacyPads: [
+      // Previous active V4 pad: required a non-zero dev buy to mint its
+      // bounded-range position (msg.value == 0 reverted). Superseded by the
+      // single-sided, optional-dev-buy deployment above.
+      {
+        address: "0xe231f68A59d991E889Daa48061efEdb422C2CFd5",
+        startBlock: 57635289n,
+        endBlock: 57688518n,
+        kind: "v4",
+      },
       // Previous active V4 pad. Keep its launches discoverable after switching
       // new launches to the ETH-backed initial-liquidity deployment.
       {
