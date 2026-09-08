@@ -313,11 +313,11 @@ export default function DiscoverPage() {
                   type="button"
                   onClick={() => setSort(s.id)}
                   className={`rounded-full px-3.5 py-2 text-[11px] transition-all ${
-                  sort === s.id ? "bg-lime-500/20 text-lime-300 shadow-sm ring-1 ring-lime-500/30" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
+                  sort === s.id ? "bg-amber-500/20 text-amber-300 shadow-sm ring-1 ring-amber-500/30" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
                   }`}
                 >
                   {s.id === "recent" && (
-                    <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-lime-500 align-middle" />
+                    <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-500 align-middle" />
                   )}
                   {s.label}
                 </button>
@@ -345,14 +345,14 @@ export default function DiscoverPage() {
         className={`rounded-[28px] border bg-neutral-900 p-5 sm:p-7 ${
           isAncientTab
             ? "border-neutral-800 shadow-[0_18px_60px_-35px_rgba(0,0,0,0.5)]"
-            : "border-lime-900/60 bg-gradient-to-br from-lime-950/40 via-neutral-900 to-neutral-900 shadow-[0_18px_60px_-35px_rgba(132,204,22,0.25)]"
+            : "border-amber-900/60 bg-gradient-to-br from-amber-950/40 via-neutral-900 to-neutral-900 shadow-[0_18px_60px_-35px_rgba(217,166,15,0.25)]"
         }`}
       >
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
               {isAncientTab ? "Ancient Heritage" : "Growing"}
-              <span className="ml-2 inline-flex rounded-full bg-lime-500/20 px-2.5 py-1 align-middle text-xs font-medium text-lime-300">
+              <span className="ml-2 inline-flex rounded-full bg-amber-500/20 px-2.5 py-1 align-middle text-xs font-medium text-amber-300">
                 {activeRows.length}
               </span>
             </h1>

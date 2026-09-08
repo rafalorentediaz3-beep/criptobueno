@@ -167,7 +167,7 @@ export function TokenCard({
               <div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-lime-400 to-lime-600"
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600"
                     style={{ width: `${Math.max(2, progress)}%` }}
                   />
                 </div>
