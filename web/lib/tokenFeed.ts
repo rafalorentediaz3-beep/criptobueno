@@ -213,7 +213,6 @@ async function scan(): Promise<FeedPayload> {
 
   const latest = await client.getBlockNumber();
   // The active (write) pad has no endBlock; legacy pads carry the repoint block.
-  const legacyPads = pads.filter((p) => p.endBlock !== undefined);
   const activePads = pads.filter((p) => p.endBlock === undefined);
 
   let unavailable = false;
@@ -223,8 +222,16 @@ async function scan(): Promise<FeedPayload> {
   // the current V4 launch beyond the API/proxy timeout.
   const activeRound: PadTag[] = [];
   {
+    // The V4 pad is the current launcher and starts close to the chain tip.
+    // Scan it first and do not let the much older curve pad block the response
+    // on a cold Railway instance. Its immutable history is still picked up
+    // after the in-process cache has been warmed.
+    const priorityPads = activePads.filter((p) => p.kind === "v4");
+    const fallbackPads = activePads.filter((p) => p.kind !== "v4");
     const activeResults = await Promise.all(
-      activePads.map((p) => scanPadRange(p.address, p.startBlock, latest)),
+      (priorityPads.length > 0 ? priorityPads : fallbackPads).map((p) =>
+        scanPadRange(p.address, p.startBlock, latest),
+      ),
     );
     let failed = 0;
     let total = 0;
@@ -242,23 +249,10 @@ async function scan(): Promise<FeedPayload> {
   if (legacyTagged !== null) {
     legacyRound = legacyTagged;
   } else {
-    const acc: PadTag[] = [];
-    let failed = 0;
-    let total = 0;
-    for (const p of legacyPads) {
-      const upTo = p.endBlock! < latest ? p.endBlock! : latest;
-      const r = await scanPadRange(p.address, p.startBlock, upTo);
-      acc.push(...r.tagged);
-      failed += r.failed;
-      total += r.total;
-    }
-    legacyRound = acc;
-    if (total === 0 || failed / total <= 0.1) {
-      legacyTagged = acc;
-    }
-    // A legacy pad can be temporarily rate-limited without making a newly
-    // deployed active pad invisible. Keep the successful active-pad logs from
-    // this scan; retry the legacy history on the next request instead.
+    // Never block a cold request on the immutable multi-million-block history.
+    // It is optional enrichment; the active pad above is the source of all new
+    // launches. A warm process can still retain legacyTagged when available.
+    legacyRound = [];
   }
 
   const tagged = [...legacyRound, ...activeRound];
