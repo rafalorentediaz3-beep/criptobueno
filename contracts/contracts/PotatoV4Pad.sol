@@ -35,6 +35,7 @@ contract PotatoV4Pad is ReentrancyGuard {
     address public immutable treasury;
     uint256 public immutable startFdv;
     uint256 public immutable antiSnipeBlocks;
+    uint256 public immutable initialLiquidityWei;
     IUniswapV4PoolManager public immutable poolManager;
     IUniswapV4PositionManager public immutable positionManager;
     IERC20 public immutable weth;
@@ -88,33 +89,37 @@ contract PotatoV4Pad is ReentrancyGuard {
     error LaunchGriefed();
     error BannedName();
     error OnlyOwner();
-    error InitialLiquidityRequired();
     error LiquidityOverflow();
+    error InsufficientTreasuryLiquidity();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
+    receive() external payable {}
+
     constructor(
         address treasury_,
         uint256 startFdv_,
         uint256 antiSnipeBlocks_,
+        uint256 initialLiquidityWei_,
         IUniswapV4PoolManager poolManager_,
         IUniswapV4PositionManager positionManager_,
         IERC20 weth_,
         address permit2_,
         address owner_,
         string[] memory initialBannedWords_
-    ) {
+    ) payable {
         if (
             treasury_ == address(0) || startFdv_ == 0 || address(poolManager_) == address(0)
                 || address(positionManager_) == address(0) || address(weth_) == address(0)
-                || permit2_ == address(0) || owner_ == address(0)
+                || permit2_ == address(0) || owner_ == address(0) || initialLiquidityWei_ == 0
         ) revert InvalidConfig();
         treasury = treasury_;
         startFdv = startFdv_;
         antiSnipeBlocks = antiSnipeBlocks_;
+        initialLiquidityWei = initialLiquidityWei_;
         poolManager = poolManager_;
         positionManager = positionManager_;
         weth = weth_;
@@ -140,6 +145,8 @@ contract PotatoV4Pad is ReentrancyGuard {
         bytes32 salt,
         uint24 fee
     ) external payable nonReentrant returns (address token) {
+        if (msg.value != 0) revert InvalidConfig();
+        if (address(this).balance < initialLiquidityWei) revert InsufficientTreasuryLiquidity();
         int24 tickSpacing = tickSpacingForFee(fee);
         if (banned[_normHashCalldata(name)] || banned[_normHashCalldata(symbol)]) {
             revert BannedName();
@@ -188,12 +195,11 @@ contract PotatoV4Pad is ReentrancyGuard {
             hooks: address(0)
         });
         poolManager.initialize(key, sqrtPrice);
-        if (msg.value == 0) revert InitialLiquidityRequired();
-
+        bytes32 poolId = keccak256(abi.encode(key));
         uint160 sqrtLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 sqrtUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint256 amount0 = tokenIs0 ? TOTAL_SUPPLY : msg.value;
-        uint256 amount1 = tokenIs0 ? msg.value : TOTAL_SUPPLY;
+        uint256 amount0 = tokenIs0 ? TOTAL_SUPPLY : initialLiquidityWei;
+        uint256 amount1 = tokenIs0 ? initialLiquidityWei : TOTAL_SUPPLY;
         uint256 liquidityFrom0 = Math.mulDiv(
             amount0,
             Math.mulDiv(sqrtPrice, sqrtUpper, Q96),
@@ -209,7 +215,7 @@ contract PotatoV4Pad is ReentrancyGuard {
 
         // The launch ETH is the WETH side of the initial position. It remains
         // in the pool and is not treated as a separate creator buy.
-        IWETH9V4(address(weth)).deposit{value: msg.value}();
+        IWETH9V4(address(weth)).deposit{value: initialLiquidityWei}();
 
         // Authorize the PositionManager to pull the freshly minted supply through
         // Permit2. This is the standard v4 settlement path used by Robinhood's
@@ -228,7 +234,7 @@ contract PotatoV4Pad is ReentrancyGuard {
             // Local test doubles do not deploy Permit2; retain their pre-funded
             // settlement path without weakening the live Robinhood path.
             IERC20(token).safeTransfer(address(positionManager), TOTAL_SUPPLY);
-            IERC20(address(weth)).safeTransfer(address(positionManager), msg.value);
+            IERC20(address(weth)).safeTransfer(address(positionManager), initialLiquidityWei);
         }
         uint256 positionId = positionManager.nextTokenId();
         // A mint leaves the PoolManager with a negative delta for each currency
@@ -268,7 +274,6 @@ contract PotatoV4Pad is ReentrancyGuard {
         if (leftoverWeth != 0) IERC20(address(weth)).safeTransfer(treasury, leftoverWeth);
         locker.register(positionId, token, msg.sender, key.currency0, key.currency1);
 
-        bytes32 poolId = keccak256(abi.encode(key));
         v4Tokens[token] = V4Info(msg.sender, poolId, positionId, fee);
         emit TokenCreated(
             token, msg.sender, name, symbol, address(0), meta.imageURI, meta.website, meta.twitter, meta.telegram
