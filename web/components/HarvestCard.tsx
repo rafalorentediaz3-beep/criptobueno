@@ -139,7 +139,8 @@ export function HarvestCard({
     !accrued.unavailable &&
     ((accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n);
   const creatorWeth = claimableWeth + (accrued.wethAmount ?? 0n) / 2n;
-  const hasCreatorFees = creatorWeth > 0n || claimableToken > 0n;
+  const MIN_CREATOR_WETH = 1_000_000_000n;
+  const hasCreatorFees = creatorWeth >= MIN_CREATOR_WETH;
 
   // Live claimable snapshot for timeout callbacks (avoid stale closures).
   const claimableRef = useRef({ weth: claimableWeth, token: claimableToken, known: claimablesKnown });
