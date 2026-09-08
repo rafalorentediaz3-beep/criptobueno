@@ -360,7 +360,7 @@ export default function DiscoverPage() {
               {isAncientTab ? "Verified legacy runners from Robinhood." : "Tokens still climbing toward graduation on Robinhood Chain."}
             </p>
           </div>
-          <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-neutral-800 px-4 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-neutral-700 sm:inline-flex">
+          <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-4 py-2.5 text-sm font-semibold text-[#3a2100] shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)] transition-all hover:brightness-110 sm:inline-flex">
             <span className="text-lg leading-none">+</span> Create
           </Link>
         </div>

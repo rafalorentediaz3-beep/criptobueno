@@ -57,10 +57,8 @@ export function Header() {
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/create"
-            className={`hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-10px_rgba(0,0,0,0.65)] backdrop-blur-xl transition-colors hover:border-white/20 hover:bg-white/10 sm:flex ${
-              pathname === "/create"
-                ? "ring-2 ring-white/10"
-                : "text-neutral-200"
+            className={`hidden items-center gap-2 rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-4 py-2 text-sm font-semibold text-[#3a2100] shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)] transition-all hover:brightness-110 sm:flex ${
+              pathname === "/create" ? "ring-2 ring-amber-300/50" : ""
             }`}
           >
             <span className="text-lg leading-none">+</span> Create
