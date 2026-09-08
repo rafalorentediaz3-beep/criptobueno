@@ -166,9 +166,9 @@ export const CHAINS: ChainConfig[] = [
     // otherwise make the successful V4 launches invisible to the feed.
     v4PadAddress:
       process.env.NEXT_PUBLIC_V4_PAD_ADDRESS_ROBINHOOD ??
-      "0x5c9F690c2A5fA564E76d12D6ebe4900Abaccb61c",
+      "0x6d199F0EF34225A130f93b3370d20D97463487e2",
     v4PadStartBlock:
-      envBlock(process.env.NEXT_PUBLIC_V4_PAD_START_BLOCK_ROBINHOOD) ?? 57546131n,
+      envBlock(process.env.NEXT_PUBLIC_V4_PAD_START_BLOCK_ROBINHOOD) ?? 57592223n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
