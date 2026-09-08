@@ -166,14 +166,14 @@ contract PotatoV4Pad is ReentrancyGuard {
         int24 floor = _alignToSpacing(
             TickMath.getTickAtSqrtRatio(_sqrtPriceX96FromFdv(startFdv)), tickSpacing
         );
+        int24 minTick = (TickMath.MIN_TICK / tickSpacing) * tickSpacing;
         int24 maxTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
-        // The position must include the initial tick to have active liquidity.
-        // For token1, the initial price is the inverted FDV, so the range
-        // starts at -floor and extends upward; using minTick/-floor placed the
-        // position entirely below the initial price and left active liquidity at
-        // zero.
-        int24 lower = tokenIs0 ? floor : -floor;
-        int24 upper = maxTick;
+        // V4 upper ticks are exclusive. For token1, the single-sided range
+        // must end strictly below the initial tick: ending at -floor leaves
+        // active liquidity at zero, while extending above it requires WETH.
+        // Keep token0 on the analogous wide single-sided range.
+        int24 lower = tokenIs0 ? floor : minTick;
+        int24 upper = tokenIs0 ? maxTick : -floor - tickSpacing;
         uint160 sqrtPrice = TickMath.getSqrtRatioAtTick(tokenIs0 ? floor : -floor);
 
         IUniswapV4PoolManager.PoolKey memory key = IUniswapV4PoolManager.PoolKey({
@@ -222,8 +222,13 @@ contract PotatoV4Pad is ReentrancyGuard {
             lower,
             upper,
             liquidity,
-            tokenIs0 ? uint128(TOTAL_SUPPLY) : uint128(0),
-            tokenIs0 ? uint128(0) : uint128(TOTAL_SUPPLY),
+            // These are maximum amounts accepted by the PositionManager, not
+            // mint amounts. Rounding at an extreme tick can make the exact
+            // required amount one unit above TOTAL_SUPPLY; use the uint128
+            // ceiling while the freshly minted token balance remains the
+            // actual funding source.
+            type(uint128).max,
+            type(uint128).max,
             address(locker),
             bytes("")
         );
