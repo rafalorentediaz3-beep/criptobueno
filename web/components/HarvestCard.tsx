@@ -138,11 +138,8 @@ export function HarvestCard({
   const hasUncollected =
     !accrued.unavailable &&
     ((accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n);
-  // Approximate €0.50 in WETH. This prevents creator transactions whose gas
-  // cost is likely to exceed the amount that can actually be claimed.
-  const MIN_CREATOR_WETH = 200_000_000_000_000n;
   const creatorWeth = claimableWeth + (accrued.wethAmount ?? 0n) / 2n;
-  const hasEnoughCreatorWeth = creatorWeth >= MIN_CREATOR_WETH || claimableToken > 0n;
+  const hasCreatorFees = creatorWeth > 0n || claimableToken > 0n;
 
   // Live claimable snapshot for timeout callbacks (avoid stale closures).
   const claimableRef = useRef({ weth: claimableWeth, token: claimableToken, known: claimablesKnown });
@@ -191,7 +188,7 @@ export function HarvestCard({
     flow.kind === "claiming";
 
   const nothingToDo = isCreator
-    ? !hasEnoughCreatorWeth
+    ? !hasCreatorFees
     : !hasUncollected;
   const disabled = !lockerReady || busy || nothingToDo;
 
