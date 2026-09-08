@@ -235,8 +235,12 @@ async function scan(): Promise<FeedPayload> {
       total += r.total;
     }
     legacyRound = acc;
-    if (total === 0 || failed / total <= 0.1) legacyTagged = acc;
-    else unavailable = true; // gappy legacy scan — don't lock it in; retry next round
+    if (total === 0 || failed / total <= 0.1) {
+      legacyTagged = acc;
+    }
+    // A legacy pad can be temporarily rate-limited without making a newly
+    // deployed active pad invisible. Keep the successful active-pad logs from
+    // this scan; retry the legacy history on the next request instead.
   }
 
   // Active pad(s): always fresh.
