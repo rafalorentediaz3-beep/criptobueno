@@ -164,8 +164,8 @@ export const CHAINS: ChainConfig[] = [
     // Canonical live deployment. Keep this pinned so a stale Railway variable
     // cannot route launches back to the previous pad whose token1 range was
     // outside the initial price and therefore had zero active liquidity.
-    v4PadAddress: "0x6d199F0EF34225A130f93b3370d20D97463487e2",
-    v4PadStartBlock: 57592223n,
+    v4PadAddress: "0xd26Fa49ebC12e5aA24f7893dEf5A95d129C70014",
+    v4PadStartBlock: 57606053n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
@@ -184,6 +184,18 @@ export const CHAINS: ChainConfig[] = [
         address: "0x5c9F690c2A5fA564E76d12D6ebe4900Abaccb61c",
         startBlock: 57546131n,
         endBlock: 57592222n,
+        kind: "v4",
+      },
+      {
+        address: "0x6d199F0EF34225A130f93b3370d20D97463487e2",
+        startBlock: 57592223n,
+        endBlock: 57600441n,
+        kind: "v4",
+      },
+      {
+        address: "0xAbb5FE57c05B6E5750ED9fD3E5C9c75DbCAa8113",
+        startBlock: 57600442n,
+        endBlock: 57606052n,
         kind: "v4",
       },
       // v6 direct pad 0x88eB…A338 — first holder-rewards pad, superseded same day by
