@@ -103,6 +103,13 @@ export function HarvestCard({
   const lockerAbi = isV4 ? potatoV4FeeLockerAbi : potatoFeeLockerAbi;
   const lockerReady = lockerAddr !== ZERO_ADDRESS;
   const tokenReady = token !== ZERO_ADDRESS;
+  const { data: treasuryData } = useReadContract({
+    address: lockerAddr,
+    abi: lockerAbi,
+    functionName: "treasury",
+    query: { enabled: lockerReady },
+  });
+  const treasury = (treasuryData as Address | undefined) ?? ZERO_ADDRESS;
 
   const {
     data: creatorClaimableWeth,
@@ -370,6 +377,9 @@ export function HarvestCard({
       setFlow({ kind: "idle" });
     }
   }, [flow, claimWethTx.reverted, claimWethTx.error, claimTokenTx.reverted, claimTokenTx.error]);
+
+  const isTreasury = !!user && user.toLowerCase() === treasury.toLowerCase();
+  if (!isCreator && !isTreasury) return null;
 
   let label: string;
   if (collectTx.busy) label = "Collecting…";
