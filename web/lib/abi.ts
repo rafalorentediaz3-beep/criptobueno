@@ -4065,11 +4065,6 @@ export const potatoV4PadAbi = [
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
-        "name": "initialLiquidityWei_",
-        "type": "uint256"
-      },
-      {
         "internalType": "contract IUniswapV4PoolManager",
         "name": "poolManager_",
         "type": "address"
@@ -4100,7 +4095,7 @@ export const potatoV4PadAbi = [
         "type": "string[]"
       }
     ],
-    "stateMutability": "payable",
+    "stateMutability": "nonpayable",
     "type": "constructor"
   },
   {
@@ -4110,7 +4105,7 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
-    "name": "InsufficientTreasuryLiquidity",
+    "name": "InitialLiquidityRequired",
     "type": "error"
   },
   {
@@ -4410,19 +4405,6 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
-    "name": "initialLiquidityWei",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "locker",
     "outputs": [
       {
@@ -4608,9 +4590,5 @@ export const potatoV4PadAbi = [
     ],
     "stateMutability": "view",
     "type": "function"
-  },
-  {
-    "stateMutability": "payable",
-    "type": "receive"
   }
 ] as const;
