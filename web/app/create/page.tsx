@@ -57,7 +57,19 @@ function loadStockCatalogue() {
         stockCatalogueRequest = null;
       });
   }
+
   return stockCatalogueRequest;
+}
+
+function launchSimulationError(error: unknown): string {
+  const shortMessage =
+    error && typeof error === "object" && "shortMessage" in error
+      ? String((error as { shortMessage: unknown }).shortMessage)
+      : "";
+  if (shortMessage.includes("0xd81b2f2e")) {
+    return "The deployed V4 PositionManager requires Permit2 authorization. V4 launches need the updated pad deployment.";
+  }
+  return shortMessage || "The network rejected this launch before signing.";
 }
 
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
@@ -429,11 +441,7 @@ export default function CreatePage() {
         });
         if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
       } catch (error) {
-        const message =
-          error && typeof error === "object" && "shortMessage" in error
-            ? String((error as { shortMessage: unknown }).shortMessage)
-            : "The network rejected this launch before signing.";
-        showLaunchWarning(`Launch simulation failed: ${message}`);
+        showLaunchWarning(`Launch simulation failed: ${launchSimulationError(error)}`);
         return;
       }
       tx.writeContract({
@@ -461,11 +469,7 @@ export default function CreatePage() {
         });
         if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
       } catch (error) {
-        const message =
-          error && typeof error === "object" && "shortMessage" in error
-            ? String((error as { shortMessage: unknown }).shortMessage)
-            : "The network rejected this launch before signing.";
-        showLaunchWarning(`Launch simulation failed: ${message}`);
+        showLaunchWarning(`Launch simulation failed: ${launchSimulationError(error)}`);
         return;
       }
       tx.writeContract({
@@ -486,11 +490,7 @@ export default function CreatePage() {
       });
       if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
     } catch (error) {
-      const message =
-        error && typeof error === "object" && "shortMessage" in error
-          ? String((error as { shortMessage: unknown }).shortMessage)
-          : "The network rejected this launch before signing.";
-      showLaunchWarning(`Launch simulation failed: ${message}`);
+      showLaunchWarning(`Launch simulation failed: ${launchSimulationError(error)}`);
       return;
     }
     tx.writeContract({
