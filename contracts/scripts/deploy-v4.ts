@@ -34,6 +34,7 @@ async function main() {
   const owner = process.env.OWNER || deployer.address;
   const startFdv = ethers.parseEther(process.env.START_FDV_ETH || "3");
   const antiSnipeBlocks = BigInt(process.env.ANTI_SNIPE_BLOCKS || "1200");
+  const initialLiquidityWei = ethers.parseEther(process.env.INITIAL_LIQUIDITY_ETH || "0.1");
   const balance = await ethers.provider.getBalance(deployer.address);
 
   console.log(`network:  ${network.name}`);
@@ -43,9 +44,10 @@ async function main() {
   console.log(`owner:    ${owner}`);
   console.log(`start FDV: ${ethers.formatEther(startFdv)} ETH`);
   console.log(`anti-snipe: ${antiSnipeBlocks} blocks`);
+  console.log(`initial liquidity: ${ethers.formatEther(initialLiquidityWei)} ETH per launch`);
 
-  if (balance === 0n) {
-    throw new Error("The deployer has no ETH on Robinhood Chain.");
+  if (balance <= initialLiquidityWei) {
+    throw new Error("The deployer needs enough ETH for gas plus the initial liquidity reserve.");
   }
 
   const pad = await (
@@ -54,12 +56,14 @@ async function main() {
     treasury,
     startFdv,
     antiSnipeBlocks,
+    initialLiquidityWei,
     ROBINHOOD_V4.poolManager,
     ROBINHOOD_V4.positionManager,
     ROBINHOOD_V4.weth,
     ROBINHOOD_V4.permit2,
     owner,
     BANNED,
+    { value: initialLiquidityWei },
   );
   await pad.waitForDeployment();
   const receipt = await pad.deploymentTransaction()?.wait();
@@ -74,6 +78,7 @@ async function main() {
     owner,
     startFdv: startFdv.toString(),
     antiSnipeBlocks: antiSnipeBlocks.toString(),
+    initialLiquidityWei: initialLiquidityWei.toString(),
     ...ROBINHOOD_V4,
   };
   const file = path.join(__dirname, `../deployments.v4.${network.name}.json`);

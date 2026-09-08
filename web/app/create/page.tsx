@@ -265,7 +265,7 @@ export default function CreatePage() {
     !vampBlocked &&
     devBuyWei !== undefined &&
     !devBuyTooLarge &&
-    (isV4 ? canV4Launch && devBuyWei > 0n : canLaunch);
+    (isV4 ? canV4Launch : canLaunch);
 
   useEffect(() => {
     if (!tx.confirmed || !tx.receipt) return;
@@ -384,8 +384,6 @@ export default function CreatePage() {
         showLaunchWarning("Add a token image before launching.");
       } else if (devBuyWei === undefined || devBuyTooLarge) {
         showLaunchWarning("Adjust the dev buy amount before launching.");
-      } else if (isV4 && devBuyWei === 0n) {
-        showLaunchWarning("Add initial liquidity greater than 0 ETH before launching.");
       } else {
         showLaunchWarning("Complete the required fields before launching.");
       }
@@ -438,7 +436,7 @@ export default function CreatePage() {
           functionName: "createToken",
           args: [trimmedName, ticker, meta, salt, v4Fee],
           account: userAddress,
-          value: devBuyWei,
+          value: 0n,
         });
         if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
       } catch (error) {
@@ -450,7 +448,7 @@ export default function CreatePage() {
         abi: potatoV4PadAbi,
         functionName: "createToken",
         args: [trimmedName, ticker, meta, salt, v4Fee],
-        value: devBuyWei,
+        value: 0n,
         ...(gas ? { gas } : {}),
       });
       return;
@@ -729,30 +727,26 @@ export default function CreatePage() {
               <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="devbuy" className={labelCls}>
-                    {isV4 ? "Initial liquidity (ETH)" : "Dev buy (ETH)"}
+                    {isV4 ? "Initial liquidity" : "Dev buy (ETH)"}
                   </label>
                   <span className="text-[9px] text-neutral-600">
                     {isV4
-                      ? "All of this ETH enters the pool"
+                      ? "Funded automatically by the platform treasury"
                       : `Max ${maxDevBuyWei !== undefined ? formatEth(maxDevBuyWei) : "…"} ETH`}
                   </span>
                 </div>
                 <input
                   id="devbuy"
                   className={`${inputCls} font-mono tabular-nums`}
-                  placeholder={isV4 ? "0.01" : "0.00"}
+                  placeholder={isV4 ? "Automatic" : "0.00"}
                   inputMode="decimal"
-                  value={devBuy}
+                  disabled={isV4}
+                  value={isV4 ? "" : devBuy}
                   onChange={(e) => setDevBuy(e.target.value)}
                 />
                 {isV4 && (
                   <p className="text-xs text-neutral-600">
-                    This ETH is wrapped and added to the initial Uniswap v4 liquidity.
-                  </p>
-                )}
-                {isV4 && devBuyWei === 0n && (
-                  <p className="text-xs text-amber-700">
-                    Enter an amount greater than 0 ETH. A V4 pool cannot be created without initial liquidity.
+                    The platform treasury funds the initial Uniswap v4 liquidity automatically.
                   </p>
                 )}
                 {devBuy.trim() !== "" && devBuyWei === undefined && (
