@@ -120,7 +120,7 @@ export function HarvestCard({
     abi: lockerAbi,
     functionName: "claimable",
     args: [weth, creator],
-    query: { enabled: lockerReady && weth !== ZERO_ADDRESS },
+    query: { enabled: lockerReady && weth !== ZERO_ADDRESS, refetchInterval: 15_000 },
   });
 
   const {
@@ -132,7 +132,7 @@ export function HarvestCard({
     abi: lockerAbi,
     functionName: "claimable",
     args: [token, creator],
-    query: { enabled: lockerReady && tokenReady },
+    query: { enabled: lockerReady && tokenReady, refetchInterval: 15_000 },
   });
 
   const isCreator = !!user && user.toLowerCase() === creator.toLowerCase();

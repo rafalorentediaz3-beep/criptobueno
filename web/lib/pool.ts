@@ -354,7 +354,7 @@ export function usePoolStats(
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
       { address: weth, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? weth] },
     ],
-    query: { enabled },
+    query: { enabled, refetchInterval: 15_000 },
   });
 
   return useMemo<PoolStats>(() => {

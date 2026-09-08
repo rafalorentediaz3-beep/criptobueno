@@ -238,6 +238,8 @@ export default function TokenPageClient() {
         <TokenChart
           token={token}
           pool={pool}
+          poolId={resolved.poolId}
+          priceWeth={priceWeth}
           isV4={isV4}
           isCurve={isCurve}
           bonded={resolved.bonded}

@@ -1,7 +1,11 @@
 "use client";
 
 import { CandlestickChart, ExternalLink, Sprout } from "lucide-react";
-import type { Address } from "viem";
+import { useState } from "react";
+import { decodeEventLog, parseAbiItem } from "viem";
+import type { Address, Hex } from "viem";
+import { usePublicClient } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
 import { usePad } from "@/lib/hooks";
 import {
   GECKOTERMINAL_NETWORKS,
@@ -12,6 +16,12 @@ import {
 import { bpsToPercent } from "@/lib/format";
 import { useGeckoIndexed } from "@/lib/useGeckoIndexed";
 import { ProgressBar } from "@/components/ProgressBar";
+import { priceWethPerToken, tokenIsToken0 } from "@/lib/pool";
+import { V4_POOL_MANAGER_ADDRESSES } from "@/lib/config";
+
+const v4SwapEvent = parseAbiItem(
+  "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
+);
 
 /**
  * Price chart for a PotatoPad token. Every token — curve or direct — trades on a
@@ -23,6 +33,8 @@ import { ProgressBar } from "@/components/ProgressBar";
 export function TokenChart({
   token,
   pool,
+  poolId,
+  priceWeth = 0,
   isCurve = false,
   isV4 = false,
   bonded = false,
@@ -30,6 +42,9 @@ export function TokenChart({
 }: {
   token: Address;
   pool: Address;
+  poolId?: Hex;
+  /** Current WETH price, refreshed by the parent pool query. */
+  priceWeth?: number;
   /** True when this token launched on the bonding-curve pad. */
   isCurve?: boolean;
   /** True when this token trades through a Uniswap V4 PoolManager pool. */
@@ -40,6 +55,8 @@ export function TokenChart({
   progressBps?: bigint;
 }) {
   const { chainId } = usePad();
+  const client = usePublicClient();
+  const [range, setRange] = useState<"1H" | "6H" | "1D">("1D");
   const hasPool = pool !== ZERO_ADDRESS && !isV4;
   // Only embed once GeckoTerminal has actually indexed the pool; a brand-new
   // pool would otherwise render GT's own 404 inside the iframe. Flips to the
@@ -53,6 +70,47 @@ export function TokenChart({
   const indexing = hasPool && geckoStatus === "missing";
   // A bonded curve is 100% by definition, regardless of the live pool tick.
   const barBps = bonded ? 10_000n : progressBps;
+  const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
+  const v4HistoryQuery = useQuery({
+    queryKey: ["v4-chart", chainId, poolId, range],
+    enabled: isV4 && !!poolId && !!client,
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      if (!client || !poolId) return [];
+      const latest = await client.getBlockNumber();
+      const blocks = range === "1H" ? 1_200n : range === "6H" ? 7_200n : 28_800n;
+      const logs = await client.getLogs({
+        address: v4Manager,
+        event: v4SwapEvent,
+        args: { id: poolId },
+        fromBlock: latest > blocks ? latest - blocks : 0n,
+        toBlock: latest,
+      });
+      return logs
+        .map((log) => {
+          const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });
+          return {
+            block: log.blockNumber ?? 0n,
+            price: priceWethPerToken(
+              decoded.args.sqrtPriceX96,
+              tokenIsToken0(token, "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"),
+            ),
+          };
+        })
+        .filter((point) => point.price > 0);
+    },
+  });
+  const v4Points = v4HistoryQuery.data ?? [];
+  const chartPrices = v4Points.length > 0 ? v4Points.map((p) => p.price) : priceWeth > 0 ? [priceWeth] : [];
+  const chartMin = Math.min(...chartPrices);
+  const chartMax = Math.max(...chartPrices);
+  const chartPath = chartPrices
+    .map((value, index) => {
+      const x = chartPrices.length === 1 ? 50 : (index / (chartPrices.length - 1)) * 100;
+      const y = chartMax === chartMin ? 50 : 92 - ((value - chartMin) / (chartMax - chartMin)) * 84;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
 
   return (
     <section className="card p-4 sm:p-6">
@@ -94,6 +152,32 @@ export function TokenChart({
                 ? "This token trades live on Uniswap V4. GeckoTerminal does not provide an indexed chart for this PoolManager pool yet."
                 : "This token trades live on Uniswap V3. A price chart isn't indexed on this network yet."}
           </p>
+          {isV4 && (
+            <div className="w-full max-w-3xl rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-mono text-sm text-amber-400">
+                  {priceWeth > 0 ? `${priceWeth.toFixed(12)} WETH` : "Loading price…"}
+                </span>
+                <div className="flex gap-1">
+                  {(["1H", "6H", "1D"] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setRange(item)}
+                      className={`rounded px-2 py-1 text-[10px] ${range === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <svg viewBox="0 0 100 100" className="h-44 w-full" role="img" aria-label="V4 price chart">
+                <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#29231b" strokeWidth="0.5" />
+                {chartPath && <path d={chartPath} fill="none" stroke="#d59b32" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+              </svg>
+              <p className="mt-1 text-[10px] text-neutral-600">On-chain Uniswap V4 swaps · updates every 15 seconds</p>
+            </div>
+          )}
           <a
             href={uniswapSwapUrl(token, chainId)}
             target="_blank"
