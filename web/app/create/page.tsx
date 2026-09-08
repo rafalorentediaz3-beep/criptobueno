@@ -233,11 +233,13 @@ export default function CreatePage() {
   }
 
   const devBuyWei = devBuy.trim() === "" ? 0n : tryParseEther(devBuy);
+  const isV4 = launchMode === "v4";
   // A requested dev-buy is "too large" if it exceeds the cap — or if the cap
   // hasn't loaded yet (fail closed so a race can't submit an over-cap buy).
   const devBuyTooLarge =
     devBuyWei !== undefined &&
     devBuyWei > 0n &&
+    !isV4 &&
     (maxDevBuyWei === undefined || devBuyWei > maxDevBuyWei);
 
   // Anti-vampire shield: block names/tickers of every curated ancient (matches the
@@ -256,7 +258,6 @@ export default function CreatePage() {
   const symbolBlocked = symbol.trim().length > 0 && blacklist.has(symbol.trim().toLowerCase());
   const vampBlocked = nameBlocked || symbolBlocked;
 
-  const isV4 = launchMode === "v4";
   const formValid =
     name.trim().length > 0 &&
     symbol.trim().length > 0 &&
@@ -264,7 +265,6 @@ export default function CreatePage() {
     !vampBlocked &&
     devBuyWei !== undefined &&
     !devBuyTooLarge &&
-    (!isV4 || devBuyWei === 0n) &&
     (isV4 ? canV4Launch : canLaunch);
 
   useEffect(() => {
@@ -384,8 +384,6 @@ export default function CreatePage() {
         showLaunchWarning("Add a token image before launching.");
       } else if (devBuyWei === undefined || devBuyTooLarge) {
         showLaunchWarning("Adjust the dev buy amount before launching.");
-      } else if (isV4 && devBuyWei !== 0n) {
-        showLaunchWarning("Uniswap v4 launches do not include a dev buy yet. Set it to 0.");
       } else {
         showLaunchWarning("Complete the required fields before launching.");
       }
@@ -438,6 +436,7 @@ export default function CreatePage() {
           functionName: "createToken",
           args: [trimmedName, ticker, meta, salt, v4Fee],
           account: userAddress,
+          value: devBuyWei,
         });
         if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
       } catch (error) {
@@ -449,6 +448,7 @@ export default function CreatePage() {
         abi: potatoV4PadAbi,
         functionName: "createToken",
         args: [trimmedName, ticker, meta, salt, v4Fee],
+        value: devBuyWei,
         ...(gas ? { gas } : {}),
       });
       return;
@@ -727,10 +727,12 @@ export default function CreatePage() {
               <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="devbuy" className={labelCls}>
-                    Dev buy (ETH)
+                    {isV4 ? "Initial liquidity (ETH)" : "Dev buy (ETH)"}
                   </label>
                   <span className="text-[9px] text-neutral-600">
-                    Max {maxDevBuyWei !== undefined ? formatEth(maxDevBuyWei) : "…"} ETH
+                    {isV4
+                      ? "All of this ETH enters the pool"
+                      : `Max ${maxDevBuyWei !== undefined ? formatEth(maxDevBuyWei) : "…"} ETH`}
                   </span>
                 </div>
                 <input
@@ -738,13 +740,12 @@ export default function CreatePage() {
                   className={`${inputCls} font-mono tabular-nums`}
                   placeholder="0.00"
                   inputMode="decimal"
-                  disabled={isV4}
                   value={devBuy}
                   onChange={(e) => setDevBuy(e.target.value)}
                 />
                 {isV4 && (
                   <p className="text-xs text-neutral-600">
-                    v4 launches start with liquidity only. Buy after launch through Uniswap.
+                    This ETH is wrapped and added to the initial Uniswap v4 liquidity.
                   </p>
                 )}
                 {devBuy.trim() !== "" && devBuyWei === undefined && (

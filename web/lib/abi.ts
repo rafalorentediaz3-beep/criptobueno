@@ -4105,7 +4105,7 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
-    "name": "DevBuyUnsupported",
+    "name": "InitialLiquidityRequired",
     "type": "error"
   },
   {
