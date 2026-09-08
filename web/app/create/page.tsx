@@ -436,7 +436,7 @@ export default function CreatePage() {
           functionName: "createToken",
           args: [trimmedName, ticker, meta, salt, v4Fee],
           account: userAddress,
-          value: devBuyWei,
+          value: 0n,
         });
         if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
       } catch (error) {
@@ -448,7 +448,7 @@ export default function CreatePage() {
         abi: potatoV4PadAbi,
         functionName: "createToken",
         args: [trimmedName, ticker, meta, salt, v4Fee],
-        value: devBuyWei,
+        value: 0n,
         ...(gas ? { gas } : {}),
       });
       return;
@@ -727,23 +727,26 @@ export default function CreatePage() {
               <div className="rounded-2xl border border-neutral-100 bg-neutral-50/60 p-4 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="devbuy" className={labelCls}>
-                    {isV4 ? "Initial buy (ETH, optional)" : "Dev buy (ETH)"}
+                    {isV4 ? "Initial liquidity" : "Dev buy (ETH)"}
                   </label>
                   <span className="text-[9px] text-neutral-600">
-                    `Max ${maxDevBuyWei !== undefined ? formatEth(maxDevBuyWei) : "…"} ETH`
+                    {isV4
+                      ? "Funded automatically by the platform treasury"
+                      : `Max ${maxDevBuyWei !== undefined ? formatEth(maxDevBuyWei) : "…"} ETH`}
                   </span>
                 </div>
                 <input
                   id="devbuy"
                   className={`${inputCls} font-mono tabular-nums`}
-                  placeholder="0.00"
+                  placeholder={isV4 ? "Automatic" : "0.00"}
                   inputMode="decimal"
-                  value={devBuy}
+                  disabled={isV4}
+                  value={isV4 ? "" : devBuy}
                   onChange={(e) => setDevBuy(e.target.value)}
                 />
                 {isV4 && (
                   <p className="text-xs text-neutral-600">
-                    Optional initial token purchase made from the creator wallet.
+                    The platform treasury funds the initial Uniswap v4 liquidity automatically.
                   </p>
                 )}
                 {devBuy.trim() !== "" && devBuyWei === undefined && (
