@@ -345,7 +345,7 @@ export default function DiscoverPage() {
         className={`rounded-[28px] border bg-neutral-900 p-5 sm:p-7 ${
           isAncientTab
             ? "border-neutral-800 shadow-[0_18px_60px_-35px_rgba(0,0,0,0.5)]"
-            : "border-amber-500/40 bg-gradient-to-br from-amber-950/50 via-neutral-900 to-neutral-900 shadow-[0_18px_60px_-30px_rgba(242,185,15,0.45)]"
+            : "border-neutral-700 shadow-[0_18px_60px_-30px_rgba(0,0,0,0.5)]"
         }`}
       >
         <div className="mb-6 flex items-start justify-between gap-4">
