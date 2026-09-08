@@ -64,8 +64,8 @@ describe("PotatoV4Pad", () => {
       ["bytes", "bytes[]"],
       await ctx.positionManager.lastUnlockData(),
     );
-    expect(actions).to.equal("0x020d14");
-    expect(params).to.have.length(3);
+    expect(actions).to.equal("0x020b0b14");
+    expect(params).to.have.length(4);
   });
 
   it("does not silently accept an unsupported dev-buy", async () => {

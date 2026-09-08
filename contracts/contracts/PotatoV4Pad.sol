@@ -201,10 +201,11 @@ contract PotatoV4Pad is ReentrancyGuard {
         // and the PoolManager correctly reverts at the end of unlock.
         bytes memory actions = abi.encodePacked(
             bytes1(uint8(0x02)), // MINT_POSITION
-            bytes1(uint8(0x0d)), // SETTLE_PAIR
+            bytes1(uint8(0x0b)), // SETTLE token
+            bytes1(uint8(0x0b)), // SETTLE WETH
             bytes1(uint8(0x14)) // SWEEP token dust
         );
-        bytes[] memory params = new bytes[](3);
+        bytes[] memory params = new bytes[](4);
         params[0] = abi.encode(
             key,
             lower,
@@ -215,8 +216,10 @@ contract PotatoV4Pad is ReentrancyGuard {
             address(locker),
             bytes("")
         );
-        params[1] = abi.encode(key.currency0, key.currency1);
-        params[2] = abi.encode(token, DEAD);
+        uint256 contractBalance = 1 << 255;
+        params[1] = abi.encode(key.currency0, contractBalance, false);
+        params[2] = abi.encode(key.currency1, contractBalance, false);
+        params[3] = abi.encode(token, DEAD);
         positionManager.modifyLiquidities(abi.encode(actions, params), block.timestamp);
         locker.register(positionId, token, msg.sender, key.currency0, key.currency1);
 
