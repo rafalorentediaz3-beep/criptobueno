@@ -17,7 +17,10 @@ const tokenCreatedEvent = parseAbiItem(
 
 const LOG_CHUNK = 9_000n; // Alchemy on Robinhood caps eth_getLogs at 10k blocks.
 const SCAN_CONCURRENCY = 3; // Robinhood's public RPC rate-limits bursty getLogs calls.
-const CACHE_TTL_MS = 90_000;
+// Keep the server snapshot short-lived so profiles and Discover converge with
+// the chain shortly after a launch, while in-flight coalescing still prevents
+// every browser from starting its own RPC scan.
+const CACHE_TTL_MS = 10_000;
 const CHUNK_RETRIES = 3; // a window survives transient RPC blips instead of aborting the scan.
 // If more than this fraction of a pad's windows never succeed, the scan is too
 // incomplete to trust — flag `unavailable` so the client retries (vs. caching a

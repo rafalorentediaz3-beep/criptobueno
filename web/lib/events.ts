@@ -149,9 +149,13 @@ export function useLaunchActivity() {
   const query = useQuery<LaunchActivity>({
     queryKey,
     enabled: true,
-    staleTime: 60_000,
+    staleTime: 5_000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchInterval: (q) => (q.state.data?.state === "unavailable" ? 10_000 : 60_000),
+    // Keep launch history live even when the wallet is idle. Contract watches
+    // provide fast updates; polling is the fallback after reconnects or missed
+    // websocket notifications from the public RPC.
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
     // Prefer a warm local snapshot over a blank unavailable frame while revalidating.
     placeholderData: () => {
       const cached = readLaunchCache(cacheKey);
