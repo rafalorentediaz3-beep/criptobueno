@@ -138,7 +138,7 @@ contract PotatoV4Pad is ReentrancyGuard {
     ) external payable nonReentrant returns (address token) {
         if (msg.value != 0) revert DevBuyUnsupported();
         int24 tickSpacing = tickSpacingForFee(fee);
-        if (banned[_normHash(bytes(name))] || banned[_normHash(bytes(symbol))]) {
+        if (banned[_normHashCalldata(name)] || banned[_normHashCalldata(symbol)]) {
             revert BannedName();
         }
 
@@ -146,9 +146,12 @@ contract PotatoV4Pad is ReentrancyGuard {
         uint256 seed = uint256(keccak256(abi.encode(msg.sender, salt)));
         address predicted;
         uint256 tries;
-        for (; tries < MAX_SALT_TRIES; ++tries) {
+        for (; tries < MAX_SALT_TRIES;) {
             predicted = _computeTokenAddress(bytes32(seed + tries), initCodeHash);
             if (predicted.code.length == 0) break;
+            unchecked {
+                ++tries;
+            }
         }
         if (tries == MAX_SALT_TRIES) revert LaunchGriefed();
         token = tokenFactory.deploy(name, symbol, bytes32(seed + tries));
@@ -270,8 +273,26 @@ contract PotatoV4Pad is ReentrancyGuard {
         return keccak256(out);
     }
 
+    /// @dev Avoids copying launch calldata into a second memory buffer before
+    /// checking the anti-vampire list. This is on the hot launch path.
+    function _normHashCalldata(string calldata value) internal pure returns (bytes32) {
+        bytes calldata b = bytes(value);
+        uint256 len = b.length;
+        uint256 start;
+        while (start < len && b[start] == 0x20) ++start;
+        uint256 end = len;
+        while (end > start && b[end - 1] == 0x20) --end;
+        bytes memory out = new bytes(end - start);
+        for (uint256 i = start; i < end; ++i) {
+            bytes1 c = b[i];
+            if (c >= 0x41 && c <= 0x5A) c = bytes1(uint8(c) + 32);
+            out[i - start] = c;
+        }
+        return keccak256(out);
+    }
+
     function setBanned(string calldata word, bool isBanned) external onlyOwner {
-        bytes32 h = _normHash(bytes(word));
+        bytes32 h = _normHashCalldata(word);
         banned[h] = isBanned;
         emit BannedSet(h, isBanned);
     }

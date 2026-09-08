@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { bytesToHex, decodeEventLog } from "viem";
-import { useAccount, useReadContracts, useSignMessage } from "wagmi";
+import { useAccount, usePublicClient, useReadContracts, useSignMessage } from "wagmi";
 import { potatoCurvePadAbi, potatoV4PadAbi } from "@/lib/abi";
 import { SITE_URL } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
@@ -87,6 +87,7 @@ export default function CreatePage() {
   const { curvePad, v4Pad, chainId, canLaunch, canV4Launch } = usePad();
   const canCreate = canLaunch || canV4Launch;
   const tx = useTx();
+  const publicClient = usePublicClient({ chainId });
   const { tokens: ancientTokens } = useAncientTokens();
   const { address: userAddress } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -417,16 +418,30 @@ export default function CreatePage() {
     const ticker = symbol.trim().toUpperCase();
 
     if (isV4) {
+      let gas: bigint | undefined;
+      try {
+        const simulation = await publicClient?.simulateContract({
+          address: v4Pad,
+          abi: potatoV4PadAbi,
+          functionName: "createToken",
+          args: [trimmedName, ticker, meta, salt, v4Fee],
+          account: userAddress,
+        });
+        if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
+      } catch (error) {
+        const message =
+          error && typeof error === "object" && "shortMessage" in error
+            ? String((error as { shortMessage: unknown }).shortMessage)
+            : "The network rejected this launch before signing.";
+        showLaunchWarning(`Launch simulation failed: ${message}`);
+        return;
+      }
       tx.writeContract({
         address: v4Pad,
         abi: potatoV4PadAbi,
         functionName: "createToken",
         args: [trimmedName, ticker, meta, salt, v4Fee],
-        // A v4 launch initializes the pool and mints the locked position in one
-        // transaction. MetaMask can fail to estimate this call on Robinhood;
-        // an explicit ceiling lets it calculate the fee and still rejects any
-        // execution that exceeds the network block limit.
-        gas: 8_000_000n,
+        ...(gas ? { gas } : {}),
       });
       return;
     }
@@ -436,17 +451,53 @@ export default function CreatePage() {
     // Both entry points launch identically — same locked LP, same treasury cut.
     // createRewardToken additionally splits the creator half with holders.
     if (rewardsOn) {
+      let gas: bigint | undefined;
+      try {
+        const simulation = await publicClient?.simulateContract({
+          ...common,
+          functionName: "createRewardToken",
+          args: [trimmedName, ticker, meta, salt, creatorCutPct * 100],
+          account: userAddress,
+        });
+        if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
+      } catch (error) {
+        const message =
+          error && typeof error === "object" && "shortMessage" in error
+            ? String((error as { shortMessage: unknown }).shortMessage)
+            : "The network rejected this launch before signing.";
+        showLaunchWarning(`Launch simulation failed: ${message}`);
+        return;
+      }
       tx.writeContract({
         ...common,
         functionName: "createRewardToken",
         args: [trimmedName, ticker, meta, salt, creatorCutPct * 100],
+        ...(gas ? { gas } : {}),
       });
+      return;
+    }
+    let gas: bigint | undefined;
+    try {
+      const simulation = await publicClient?.simulateContract({
+        ...common,
+        functionName: "createToken",
+        args: [trimmedName, ticker, meta, salt],
+        account: userAddress,
+      });
+      if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
+    } catch (error) {
+      const message =
+        error && typeof error === "object" && "shortMessage" in error
+          ? String((error as { shortMessage: unknown }).shortMessage)
+          : "The network rejected this launch before signing.";
+      showLaunchWarning(`Launch simulation failed: ${message}`);
       return;
     }
     tx.writeContract({
       ...common,
       functionName: "createToken",
       args: [trimmedName, ticker, meta, salt],
+      ...(gas ? { gas } : {}),
     });
   }
 

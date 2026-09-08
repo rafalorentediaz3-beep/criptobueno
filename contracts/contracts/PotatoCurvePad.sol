@@ -280,7 +280,7 @@ contract PotatoCurvePad is ReentrancyGuard {
     ) internal returns (address token) {
         // Anti-vampire shield: reject blacklisted names/symbols (normalized to match
         // the client's trim().toLowerCase()) before doing any work.
-        if (banned[_normHash(bytes(name))] || banned[_normHash(bytes(symbol))]) revert Banned();
+        if (banned[_normHashCalldata(name)] || banned[_normHashCalldata(symbol)]) revert Banned();
 
         // The token is deployed by {tokenFactory} (it carries BOTH token creation
         // bytecodes; this pad cannot embed them without breaking EIP-170), so the
@@ -312,10 +312,9 @@ contract PotatoCurvePad is ReentrancyGuard {
 
         address pool = v3Factory.createPool(token, address(weth), POOL_FEE);
         PotatoToken(token).setPool(pool);
-        (uint160 existing,,,,,,) = IUniswapV3Pool(pool).slot0();
-        if (existing == 0) {
-            IUniswapV3Pool(pool).initialize(TickMath.getSqrtRatioAtTick(initTick));
-        }
+        // createPool() always returns a fresh pool, so the defensive slot0()
+        // read is unnecessary and costs an extra external call on every launch.
+        IUniswapV3Pool(pool).initialize(TickMath.getSqrtRatioAtTick(initTick));
 
         (uint256 positionId, uint128 liquidity) = _mintCurve(token, tokenIs0, tickLower, tickUpper);
         // On a holder-rewards launch the token IS the reward sink: the locker pushes
@@ -376,7 +375,8 @@ contract PotatoCurvePad is ReentrancyGuard {
                 deadline: block.timestamp
             })
         );
-        IERC20(token).forceApprove(address(positionManager), 0);
+        // The token is freshly deployed and the pad never receives tokens again.
+        // Keeping this one-time allowance avoids a second SSTORE on the hot path.
 
         (uint256 tokenUsed, uint256 wethUsed) = tokenIs0 ? (used0, used1) : (used1, used0);
         if (wethUsed != 0) revert NotSingleSided();
@@ -500,7 +500,7 @@ contract PotatoCurvePad is ReentrancyGuard {
     ///         Normalized (trim + ASCII-lowercase) before hashing, so it matches
     ///         however a creator capitalizes/pads it.
     function setBanned(string calldata word, bool isBanned) external onlyOwner {
-        bytes32 h = _normHash(bytes(word));
+        bytes32 h = _normHashCalldata(word);
         banned[h] = isBanned;
         emit BannedSet(h, isBanned);
     }
@@ -564,6 +564,24 @@ contract PotatoCurvePad is ReentrancyGuard {
         for (uint256 i = start; i < end; ++i) {
             bytes1 c = b[i];
             if (c >= 0x41 && c <= 0x5A) c = bytes1(uint8(c) + 32); // A-Z -> a-z
+            out[i - start] = c;
+        }
+        return keccak256(out);
+    }
+
+    /// @dev Avoids copying launch calldata into a second memory buffer before
+    /// checking the anti-vampire list. This is on the hot launch path.
+    function _normHashCalldata(string calldata value) internal pure returns (bytes32) {
+        bytes calldata b = bytes(value);
+        uint256 len = b.length;
+        uint256 start;
+        while (start < len && b[start] == 0x20) ++start;
+        uint256 end = len;
+        while (end > start && b[end - 1] == 0x20) --end;
+        bytes memory out = new bytes(end - start);
+        for (uint256 i = start; i < end; ++i) {
+            bytes1 c = b[i];
+            if (c >= 0x41 && c <= 0x5A) c = bytes1(uint8(c) + 32);
             out[i - start] = c;
         }
         return keccak256(out);
