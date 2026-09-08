@@ -47,8 +47,11 @@ describe("PotatoV4Pad", () => {
       NO_META,
       salt,
       500,
+      { value: E / 10n },
     );
-    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Spud", "V4SPUD", NO_META, salt, 500);
+    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Spud", "V4SPUD", NO_META, salt, 500, {
+      value: E / 10n,
+    });
     await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
     const info = await ctx.pad.v4Tokens(token);
     expect(info.creator).to.equal(ctx.creator.address);
@@ -68,7 +71,7 @@ describe("PotatoV4Pad", () => {
     expect(params).to.have.length(4);
   });
 
-  it("does not silently accept an unsupported dev-buy", async () => {
+  it("requires an initial ETH contribution for the v4 position", async () => {
     const ctx = await deploy();
     await expect(
       ctx.pad.connect(ctx.creator).createToken(
@@ -77,8 +80,8 @@ describe("PotatoV4Pad", () => {
         NO_META,
         ethers.id("v4-no-buy"),
         3_000,
-        { value: 1n },
+        { value: 0n },
       ),
-    ).to.be.revertedWithCustomError(ctx.pad, "DevBuyUnsupported");
+    ).to.be.revertedWithCustomError(ctx.pad, "InitialLiquidityRequired");
   });
 });
