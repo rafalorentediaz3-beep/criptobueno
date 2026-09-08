@@ -134,9 +134,14 @@ export function HarvestCard({
   const claimablesKnown =
     creatorClaimableWeth !== undefined && creatorClaimableToken !== undefined;
   const hasClaimable = claimableWeth > 0n || claimableToken > 0n;
-  const hasUncollected = isV4
-    ? true
-    : (accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n;
+  const hasUncollected =
+    !accrued.unavailable &&
+    ((accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n);
+  // Approximate €0.50 in WETH. This prevents creator transactions whose gas
+  // cost is likely to exceed the amount that can actually be claimed.
+  const MIN_CREATOR_WETH = 200_000_000_000_000n;
+  const creatorWeth = claimableWeth + (accrued.wethAmount ?? 0n) / 2n;
+  const hasEnoughCreatorWeth = creatorWeth >= MIN_CREATOR_WETH || claimableToken > 0n;
 
   // Live claimable snapshot for timeout callbacks (avoid stale closures).
   const claimableRef = useRef({ weth: claimableWeth, token: claimableToken, known: claimablesKnown });
@@ -184,7 +189,9 @@ export function HarvestCard({
     flow.kind === "await_claimables" ||
     flow.kind === "claiming";
 
-  const nothingToDo = !hasUncollected && !(isCreator && hasClaimable);
+  const nothingToDo = isCreator
+    ? !hasEnoughCreatorWeth
+    : !hasUncollected;
   const disabled = !lockerReady || busy || nothingToDo;
 
   const writeClaim = useCallback(
@@ -385,7 +392,6 @@ export function HarvestCard({
   // Creator's realizable fees = already set-aside (claimable) + their 50% of what
   // is still uncollected in the pool. One figure so it never reads "0 WETH" while
   // fees sit uncollected in the position.
-  const creatorWeth = claimableWeth + (accrued.wethAmount ?? 0n) / 2n;
   // Creators realize WETH only — the launched-token side is burned on the current
   // pad. (Legacy-pad tokens still deliver their token share on claim, just not
   // shown; the card presents the WETH-only burn model everywhere.)
@@ -395,7 +401,7 @@ export function HarvestCard({
   return (
     <div className="card p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
-        <Leaf className="h-4 w-4 text-amber-500" />
+        <Leaf className="h-4 w-4 text-white" />
         Creator fees
       </h3>
       <p className="mt-1 text-xs text-neutral-500">
