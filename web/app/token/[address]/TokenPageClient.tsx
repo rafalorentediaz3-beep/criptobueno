@@ -65,7 +65,11 @@ export default function TokenPageClient() {
   // Price / market cap / liquidity from the Uniswap pool. Curve tokens have a
   // live pool from block one, so this is continuous across migration; {curve}
   // only supplies the migration flag + progress for the curve UI.
-  const poolStats = usePoolStats(token, pool !== ZERO_ADDRESS ? pool : undefined);
+  const poolStats = usePoolStats(
+    token,
+    pool !== ZERO_ADDRESS ? pool : undefined,
+    isV4 ? resolved.poolId : undefined,
+  );
   const priceWeth = poolStats.priceWeth;
   const marketCapEth = poolStats.marketCapEth;
   const liquidityProxy = poolStats.wethInPool;

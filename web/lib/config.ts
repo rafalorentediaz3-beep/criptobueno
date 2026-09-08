@@ -26,6 +26,11 @@ export const robinhoodChain = defineChain({
 export const ZERO_ADDRESS =
   "0x0000000000000000000000000000000000000000" as Address;
 
+/** Canonical Uniswap V4 PoolManager per chain. */
+export const V4_POOL_MANAGER_ADDRESSES: Record<number, Address> = {
+  4663: "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+};
+
 /**
  * Tokens shown as Migrated even though their on-chain `bonded` latch is false.
  *
