@@ -102,10 +102,11 @@ export async function POST(req: NextRequest) {
 
   const pinataForm = new FormData();
   pinataForm.append("file", file, file.name || "image");
+  pinataForm.append("network", "public");
 
   let res: Response;
   try {
-    res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+    res = await fetch("https://uploads.pinata.cloud/v3/files", {
       method: "POST",
       headers: { Authorization: `Bearer ${jwt}` },
       body: pinataForm,
@@ -115,13 +116,20 @@ export async function POST(req: NextRequest) {
   }
 
   if (!res.ok) {
-    // Log the upstream detail server-side; don't leak provider/plan messages.
-    console.error("pinata upload failed:", res.status, (await res.text()).slice(0, 300));
-    return NextResponse.json({ error: "image pinning failed" }, { status: 502 });
+    const detail = (await res.text()).slice(0, 300);
+    console.error("pinata upload failed:", res.status, detail);
+    if (res.status === 401 || res.status === 403) {
+      return NextResponse.json(
+        { error: "Pinata rejected PINATA_JWT; check that the token is valid and has public file upload permission" },
+        { status: 502 },
+      );
+    }
+    return NextResponse.json({ error: `Pinata upload failed (${res.status})` }, { status: 502 });
   }
 
-  const data = (await res.json()) as { IpfsHash?: string };
-  if (!data.IpfsHash) {
+  const data = (await res.json()) as { data?: { cid?: string }; cid?: string };
+  const cid = data.data?.cid ?? data.cid;
+  if (!cid) {
     return NextResponse.json({ error: "no CID returned by pinata" }, { status: 502 });
   }
 
@@ -131,9 +139,9 @@ export async function POST(req: NextRequest) {
   // imageless right when everyone clicks it. Warming here means the proxy has
   // the bytes cached (for a year) before the launch tx even confirms.
   const origin = new URL(req.url).origin;
-  void fetch(`${origin}/api/img?cid=${data.IpfsHash}`).catch(() => {});
+  void fetch(`${origin}/api/img?cid=${cid}`).catch(() => {});
 
-  return NextResponse.json({ uri: `ipfs://${data.IpfsHash}`, cid: data.IpfsHash });
+  return NextResponse.json({ uri: `ipfs://${cid}`, cid });
 }
 
 export const runtime = "nodejs";
