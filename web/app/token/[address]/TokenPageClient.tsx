@@ -238,6 +238,7 @@ export default function TokenPageClient() {
         <TokenChart
           token={token}
           pool={pool}
+          isV4={isV4}
           isCurve={isCurve}
           bonded={resolved.bonded}
           progressBps={curve.progressBps}

@@ -24,6 +24,7 @@ export function TokenChart({
   token,
   pool,
   isCurve = false,
+  isV4 = false,
   bonded = false,
   progressBps = 0n,
 }: {
@@ -31,13 +32,15 @@ export function TokenChart({
   pool: Address;
   /** True when this token launched on the bonding-curve pad. */
   isCurve?: boolean;
+  /** True when this token trades through a Uniswap V4 PoolManager pool. */
+  isV4?: boolean;
   /** True once the curve bonded (LP permanently locked). */
   bonded?: boolean;
   /** Curve progress toward bond, 0–10000 bps (100% once bonded). */
   progressBps?: bigint;
 }) {
   const { chainId } = usePad();
-  const hasPool = pool !== ZERO_ADDRESS;
+  const hasPool = pool !== ZERO_ADDRESS && !isV4;
   // Only embed once GeckoTerminal has actually indexed the pool; a brand-new
   // pool would otherwise render GT's own 404 inside the iframe. Flips to the
   // chart automatically once GT catches up (the hook polls while missing).
@@ -87,7 +90,9 @@ export function TokenChart({
           <p className="max-w-xs text-sm text-neutral-400">
             {indexing
               ? "Fresh launch — GeckoTerminal is still indexing this pool. The chart appears here automatically within a few minutes. It's already live and tradable."
-              : "This token trades live on Uniswap V3. A price chart isn't indexed on this network yet."}
+              : isV4
+                ? "This token trades live on Uniswap V4. GeckoTerminal does not provide an indexed chart for this PoolManager pool yet."
+                : "This token trades live on Uniswap V3. A price chart isn't indexed on this network yet."}
           </p>
           <a
             href={uniswapSwapUrl(token, chainId)}
