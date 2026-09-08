@@ -913,7 +913,7 @@ export default function CreatePage() {
                 </button>
               </div>
             )}
-            <div className="md:absolute md:inset-x-0 md:top-1/2 md:-translate-y-1/2">
+            <div className="relative -translate-y-24 md:absolute md:inset-x-0 md:top-1/2 md:-translate-y-1/2">
               <div className="w-full">
                 <div className="launch-cta-border">
                   <button
@@ -931,7 +931,6 @@ export default function CreatePage() {
                 </div>
               </div>
             </div>
-
             <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
           </div>
         </div>
