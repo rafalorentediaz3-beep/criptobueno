@@ -135,12 +135,8 @@ export function HarvestCard({
   const claimablesKnown =
     creatorClaimableWeth !== undefined && creatorClaimableToken !== undefined;
   const hasClaimable = claimableWeth > 0n || claimableToken > 0n;
-  const hasUncollected =
-    !accrued.unavailable &&
-    ((accrued.wethAmount ?? 0n) > 0n || (accrued.tokenAmount ?? 0n) > 0n);
+  const hasUncollected = true;
   const creatorWeth = claimableWeth + (accrued.wethAmount ?? 0n) / 2n;
-  const MIN_CREATOR_WETH = 1_000_000_000n;
-  const hasCreatorFees = creatorWeth >= MIN_CREATOR_WETH;
 
   // Live claimable snapshot for timeout callbacks (avoid stale closures).
   const claimableRef = useRef({ weth: claimableWeth, token: claimableToken, known: claimablesKnown });
@@ -188,9 +184,7 @@ export function HarvestCard({
     flow.kind === "await_claimables" ||
     flow.kind === "claiming";
 
-  const nothingToDo = isCreator
-    ? !hasCreatorFees
-    : !hasUncollected;
+  const nothingToDo = false;
   const disabled = !lockerReady || busy || nothingToDo;
 
   const writeClaim = useCallback(
@@ -400,7 +394,7 @@ export function HarvestCard({
   return (
     <div className="card p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
-        <Leaf className="h-4 w-4 text-white" />
+        <Leaf className="h-4 w-4 text-amber-500" />
         Creator fees
       </h3>
       <p className="mt-1 text-xs text-neutral-500">
