@@ -4,7 +4,7 @@ import { Coins, Leaf } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Address } from "viem";
 import { useAccount, useReadContract } from "wagmi";
-import { potatoFeeLockerAbi, potatoPadAbi, potatoV4PadAbi } from "@/lib/abi";
+import { potatoFeeLockerAbi, potatoPadAbi, potatoV4FeeLockerAbi, potatoV4PadAbi } from "@/lib/abi";
 import { PAD_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
 import { formatEth } from "@/lib/format";
@@ -100,6 +100,7 @@ export function HarvestCard({
   });
 
   const lockerAddr = (locker as Address | undefined) ?? ZERO_ADDRESS;
+  const lockerAbi = isV4 ? potatoV4FeeLockerAbi : potatoFeeLockerAbi;
   const lockerReady = lockerAddr !== ZERO_ADDRESS;
   const tokenReady = token !== ZERO_ADDRESS;
 
@@ -109,7 +110,7 @@ export function HarvestCard({
     isFetching: wethFetching,
   } = useReadContract({
     address: lockerAddr,
-    abi: potatoFeeLockerAbi,
+    abi: lockerAbi,
     functionName: "claimable",
     args: [weth, creator],
     query: { enabled: lockerReady && weth !== ZERO_ADDRESS },
@@ -121,7 +122,7 @@ export function HarvestCard({
     isFetching: tokenFetching,
   } = useReadContract({
     address: lockerAddr,
-    abi: potatoFeeLockerAbi,
+    abi: lockerAbi,
     functionName: "claimable",
     args: [token, creator],
     query: { enabled: lockerReady && tokenReady },
@@ -202,20 +203,20 @@ export function HarvestCard({
       if (asset === "weth") {
         claimWethTxRef.current.writeContract({
           address: lockerAddr,
-          abi: potatoFeeLockerAbi,
+          abi: lockerAbi,
           functionName: "claim",
           args: [weth],
         });
       } else {
         claimTokenTxRef.current.writeContract({
           address: lockerAddr,
-          abi: potatoFeeLockerAbi,
+          abi: lockerAbi,
           functionName: "claim",
           args: [token],
         });
       }
     },
-    [lockerAddr, weth, token],
+    [lockerAbi, lockerAddr, weth, token],
   );
 
   function buildQueue(wethAmt: bigint, tokenAmt: bigint): ClaimAsset[] {
@@ -252,7 +253,7 @@ export function HarvestCard({
     setFlow({ kind: "idle" });
     collectTx.writeContract({
       address: lockerAddr,
-      abi: potatoFeeLockerAbi,
+      abi: lockerAbi,
       functionName: "collect",
       args: [lpTokenId],
     });
