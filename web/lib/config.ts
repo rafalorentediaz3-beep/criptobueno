@@ -161,14 +161,11 @@ export const CHAINS: ChainConfig[] = [
     padAddress: process.env.NEXT_PUBLIC_PAD_ADDRESS_ROBINHOOD,
     curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_ROBINHOOD,
     curvePadStartBlock: 14_984_900n, // PotatoCurvePad 0x94085E…6069 (~$2.5k open / $44k bond, holder rewards) deploy block 14984902
-    // Keep the live deployment as a safe fallback. NEXT_PUBLIC_* values are
-    // baked into the Next.js build, so a Railway runtime-only variable would
-    // otherwise make the successful V4 launches invisible to the feed.
-    v4PadAddress:
-      process.env.NEXT_PUBLIC_V4_PAD_ADDRESS_ROBINHOOD ??
-      "0x6d199F0EF34225A130f93b3370d20D97463487e2",
-    v4PadStartBlock:
-      envBlock(process.env.NEXT_PUBLIC_V4_PAD_START_BLOCK_ROBINHOOD) ?? 57592223n,
+    // Canonical live deployment. Keep this pinned so a stale Railway variable
+    // cannot route launches back to the previous pad whose token1 range was
+    // outside the initial price and therefore had zero active liquidity.
+    v4PadAddress: "0x6d199F0EF34225A130f93b3370d20D97463487e2",
+    v4PadStartBlock: 57592223n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
