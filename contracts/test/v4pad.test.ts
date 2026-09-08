@@ -2,7 +2,6 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 const E = 10n ** 18n;
-const INITIAL_LIQUIDITY = E / 10n;
 const NO_META = { imageURI: "", website: "", twitter: "", telegram: "" };
 
 describe("PotatoV4Pad", () => {
@@ -19,14 +18,12 @@ describe("PotatoV4Pad", () => {
       treasury.address,
       3n * E,
       10,
-      INITIAL_LIQUIDITY,
       poolManager.target,
       positionManager.target,
       weth.target,
       "0x0000000000000000000000000000000000000002",
       deployer.address,
       [],
-      { value: INITIAL_LIQUIDITY },
     );
     return { deployer, treasury, creator, poolManager, positionManager, weth, pad };
   }
@@ -50,8 +47,11 @@ describe("PotatoV4Pad", () => {
       NO_META,
       salt,
       500,
+      { value: E / 10n },
     );
-    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Spud", "V4SPUD", NO_META, salt, 500);
+    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Spud", "V4SPUD", NO_META, salt, 500, {
+      value: E / 10n,
+    });
     await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
     const info = await ctx.pad.v4Tokens(token);
     expect(info.creator).to.equal(ctx.creator.address);
@@ -71,16 +71,15 @@ describe("PotatoV4Pad", () => {
     expect(params).to.have.length(4);
   });
 
-  it("uses the treasury reserve without requiring creator ETH", async () => {
+  it("allows a launch without an optional creator dev buy", async () => {
     const ctx = await deploy();
-    await expect(
-      ctx.pad.connect(ctx.creator).createToken(
-        "V4 No Buy",
-        "V4NB",
-        NO_META,
-        ethers.id("v4-no-buy"),
-        3_000,
-      ),
-    ).to.emit(ctx.pad, "V4PoolCreated");
+    const token = await ctx.pad.connect(ctx.creator).createToken.staticCall(
+      "V4 No Buy", "V4NB", NO_META, ethers.id("v4-no-buy"), 3_000, { value: 0n }
+    );
+    const tx = await ctx.pad.connect(ctx.creator).createToken(
+      "V4 No Buy", "V4NB", NO_META, ethers.id("v4-no-buy"), 3_000, { value: 0n }
+    );
+    await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
+    expect((await ctx.pad.v4Tokens(token)).positionId).to.equal(0);
   });
 });
