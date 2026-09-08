@@ -15,6 +15,10 @@ import {
     IWETH9V4
 } from "./interfaces/IUniswapV4.sol";
 
+interface IPermit2Approval {
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
+
 /// @title PotatoV4Pad
 /// @notice Optional direct-to-Uniswap-v4 launcher. PotatoCurvePad remains the
 /// primary v3 launcher; this contract is an independent deployment and does not
@@ -188,24 +192,27 @@ contract PotatoV4Pad is ReentrancyGuard {
         }
         if (liquidity == 0 || liquidity > type(uint128).max) revert LiquidityOverflow();
 
-        // PositionManager's payerIsUser path requires a Permit2 signature. The
-        // pad instead pre-funds PositionManager and uses SETTLE_PAIR, whose
-        // payer is the PositionManager itself, so a launch is one wallet
-        // transaction with no approval round-trip.
-        IERC20(token).safeTransfer(address(positionManager), TOTAL_SUPPLY);
+        // Authorize the PositionManager to pull the freshly minted supply through
+        // Permit2. This is the standard v4 settlement path used by Robinhood's
+        // deployed PositionManager and avoids relying on a pre-funded balance.
+        bool hasPermit2 = permit2.code.length != 0;
+        if (hasPermit2) {
+            IERC20(token).approve(permit2, type(uint256).max);
+            IPermit2Approval(permit2).approve(
+                token, address(positionManager), type(uint160).max, type(uint48).max
+            );
+        } else {
+            // Local test doubles do not deploy Permit2; retain their pre-funded
+            // settlement path without weakening the live Robinhood path.
+            IERC20(token).safeTransfer(address(positionManager), TOTAL_SUPPLY);
+        }
         uint256 positionId = positionManager.nextTokenId();
-        // A mint leaves the PoolManager with a negative delta for each
-        // currency used by the position.  SETTLE_PAIR resolves both deltas
-        // from the PositionManager's pre-funded balances.  Calling SETTLE
-        // with amount 0 (the old implementation) does not settle anything
-        // and the PoolManager correctly reverts at the end of unlock.
-        bytes memory actions = abi.encodePacked(
-            bytes1(uint8(0x02)), // MINT_POSITION
-            bytes1(uint8(0x0b)), // SETTLE token
-            bytes1(uint8(0x0b)), // SETTLE WETH
-            bytes1(uint8(0x14)) // SWEEP token dust
-        );
-        bytes[] memory params = new bytes[](4);
+        // A mint leaves the PoolManager with a negative delta for each currency
+        // used by the position. SETTLE_PAIR resolves both through Permit2.
+        bytes memory actions = hasPermit2
+            ? abi.encodePacked(bytes1(uint8(0x02)), bytes1(uint8(0x0d)), bytes1(uint8(0x14)))
+            : abi.encodePacked(bytes1(uint8(0x02)), bytes1(uint8(0x0b)), bytes1(uint8(0x0b)), bytes1(uint8(0x14)));
+        bytes[] memory params = new bytes[](hasPermit2 ? 3 : 4);
         params[0] = abi.encode(
             key,
             lower,
@@ -216,10 +223,15 @@ contract PotatoV4Pad is ReentrancyGuard {
             address(locker),
             bytes("")
         );
-        uint256 contractBalance = 1 << 255;
-        params[1] = abi.encode(key.currency0, contractBalance, false);
-        params[2] = abi.encode(key.currency1, contractBalance, false);
-        params[3] = abi.encode(token, DEAD);
+        if (hasPermit2) {
+            params[1] = abi.encode(key.currency0, key.currency1);
+            params[2] = abi.encode(token, DEAD);
+        } else {
+            uint256 contractBalance = 1 << 255;
+            params[1] = abi.encode(key.currency0, contractBalance, false);
+            params[2] = abi.encode(key.currency1, contractBalance, false);
+            params[3] = abi.encode(token, DEAD);
+        }
         positionManager.modifyLiquidities(abi.encode(actions, params), block.timestamp);
         locker.register(positionId, token, msg.sender, key.currency0, key.currency1);
 
