@@ -16,7 +16,7 @@ const tokenCreatedEvent = parseAbiItem(
 );
 
 const LOG_CHUNK = 9_000n; // Alchemy on Robinhood caps eth_getLogs at 10k blocks.
-const SCAN_CONCURRENCY = 6; // windows fetched at once — fast without a CU spike.
+const SCAN_CONCURRENCY = 3; // Robinhood's public RPC rate-limits bursty getLogs calls.
 const CACHE_TTL_MS = 90_000;
 const CHUNK_RETRIES = 3; // a window survives transient RPC blips instead of aborting the scan.
 // If more than this fraction of a pad's windows never succeed, the scan is too
@@ -120,7 +120,8 @@ async function fetchCreatedLogs(
       });
       return logs as unknown as CreatedLog[];
     } catch {
-      if (attempt < CHUNK_RETRIES - 1) await sleep(200 * (attempt + 1));
+      // Back off long enough for a public-RPC 429 bucket to recover.
+      if (attempt < CHUNK_RETRIES - 1) await sleep(500 * 2 ** attempt);
     }
   }
   return null;
