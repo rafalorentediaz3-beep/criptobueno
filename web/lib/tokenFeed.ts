@@ -213,6 +213,7 @@ async function scan(): Promise<FeedPayload> {
 
   const latest = await client.getBlockNumber();
   // The active (write) pad has no endBlock; legacy pads carry the repoint block.
+  const legacyPads = pads.filter((p) => p.endBlock !== undefined);
   const activePads = pads.filter((p) => p.endBlock === undefined);
 
   let unavailable = false;
@@ -249,10 +250,16 @@ async function scan(): Promise<FeedPayload> {
   if (legacyTagged !== null) {
     legacyRound = legacyTagged;
   } else {
-    // Never block a cold request on the immutable multi-million-block history.
-    // It is optional enrichment; the active pad above is the source of all new
-    // launches. A warm process can still retain legacyTagged when available.
-    legacyRound = [];
+    // Keep the previous V4 history (a small range) discoverable, but avoid
+    // blocking cold requests on the much larger legacy direct-pad history.
+    const v4History = legacyPads.filter((p) => p.kind === "v4");
+    const results = await Promise.all(
+      v4History.map((p) =>
+        scanPadRange(p.address, p.startBlock, p.endBlock! < latest ? p.endBlock! : latest),
+      ),
+    );
+    legacyRound = results.flatMap((r) => r.tagged);
+    if (results.every((r) => r.failed === 0)) legacyTagged = legacyRound;
   }
 
   const tagged = [...legacyRound, ...activeRound];
