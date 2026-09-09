@@ -54,7 +54,7 @@ export function TokenChart({
   /** Curve progress toward bond, 0–10000 bps (100% once bonded). */
   progressBps?: bigint;
 }) {
-  const { chainId } = usePad();
+  const { chainId, weth } = usePad();
   const client = usePublicClient();
   const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m">("Total");
   const hasPool = pool !== ZERO_ADDRESS && !isV4;
@@ -75,7 +75,7 @@ export function TokenChart({
   // refetch — only the client-side bucketing below changes with `interval`.
   const FETCH_BLOCKS = 5_000_000n;
   const v4HistoryQuery = useQuery({
-    queryKey: ["v4-chart", chainId, poolId],
+    queryKey: ["v4-chart", chainId, poolId, weth],
     enabled: isV4 && !!poolId && !!client,
     // Poll every second so the candles feel truly live, like a real trading terminal.
     refetchInterval: 1_000,
@@ -103,10 +103,7 @@ export function TokenChart({
           const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });
           return {
             timestamp: timestampByBlock.get(log.blockNumber ?? 0n) ?? 0,
-            price: priceWethPerToken(
-              decoded.args.sqrtPriceX96,
-              tokenIsToken0(token, "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"),
-            ),
+            price: priceWethPerToken(decoded.args.sqrtPriceX96, tokenIsToken0(token, weth)),
           };
         })
         .filter((point) => point.price > 0)
@@ -169,6 +166,40 @@ export function TokenChart({
 
   const candleMin = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : 0;
   const candleMax = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 0;
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const hoverCandle = hoverIndex !== null ? candles[hoverIndex] : undefined;
+  const formatPrice = (value: number) => `${value.toFixed(12)} WETH`;
+  // Short axis label for a compact price tick, e.g. "0.0000000030".
+  const formatAxisPrice = (value: number) => value.toFixed(10);
+  const formatTime = (ts: number) =>
+    ts > 0
+      ? new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "";
+
+  // Timestamp per candle, so the X axis can show real clock times instead of
+  // meaningless bar indexes — same bucketing as the candles above.
+  const candleTimestamps = useMemo(() => {
+    if (candles.length === 0) return [] as number[];
+    if (interval === "Total") {
+      if (v4Points.length === 0) return candles.map(() => 0);
+      const minTs = v4Points[0].timestamp;
+      const maxTs = v4Points[v4Points.length - 1].timestamp;
+      const span = Math.max(maxTs - minTs, 1);
+      const offset = CANDLE_COUNT - candles.length;
+      return candles.map((_, i) => minTs + ((i + offset + 0.5) / CANDLE_COUNT) * span);
+    }
+    const intervalSeconds = interval === "5m" ? 300 : 900;
+    const windowStart = latestTs - VISIBLE_CANDLES * intervalSeconds;
+    const offset = VISIBLE_CANDLES - candles.length;
+    return candles.map((_, i) => windowStart + (i + offset + 0.5) * intervalSeconds);
+  }, [candles, v4Points, interval, latestTs]);
+
+  // 4 evenly spaced price ticks from top (high) to bottom (low) of the visible range.
+  const priceTicks = useMemo(() => {
+    if (candles.length === 0) return [] as number[];
+    const steps = 4;
+    return Array.from({ length: steps + 1 }, (_, i) => candleMax - (i / steps) * (candleMax - candleMin));
+  }, [candleMin, candleMax, candles.length]);
 
   return (
     <section className="card p-4 pt-5 sm:p-6 sm:pt-6">
@@ -202,57 +233,138 @@ export function TokenChart({
         </div>
       ) : isV4 ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-          <div className="mb-2 flex items-center justify-end gap-1">
-            {(["Total", "5m", "15m"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setIntervalOption(item)}
-                className={`rounded px-2 py-1 text-[10px] ${interval === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
-              >
-                {item}
-              </button>
-            ))}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-sm text-amber-400">
+                {hoverCandle ? formatPrice(hoverCandle.close) : priceWeth > 0 ? formatPrice(priceWeth) : "Loading price…"}
+              </span>
+              {/* Legend so the colors are self-explanatory without hovering. */}
+              <span className="hidden items-center gap-3 text-[10px] text-neutral-500 sm:flex">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Price up
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm bg-rose-500" /> Price down
+                </span>
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {(["Total", "5m", "15m"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setIntervalOption(item)}
+                  className={`rounded px-2 py-1 text-[10px] ${interval === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
           {candles.length > 0 ? (
-            <svg viewBox="0 0 100 100" className="h-64 w-full" role="img" aria-label="V4 candlestick chart">
-              <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#27272a" strokeWidth="0.3" />
-              {candles.map((candle, index) => {
-                const slot = 100 / candles.length;
-                const cx = slot * (index + 0.5);
-                const bodyWidth = slot * 0.6;
-                const scale = (value: number) =>
-                  candleMax === candleMin ? 50 : 92 - ((value - candleMin) / (candleMax - candleMin)) * 84;
-                const up = candle.close >= candle.open;
-                const color = up ? "#22c55e" : "#ef4444";
-                const yOpen = scale(candle.open);
-                const yClose = scale(candle.close);
-                const bodyTop = Math.min(yOpen, yClose);
-                const bodyHeight = Math.max(Math.abs(yOpen - yClose), 0.6);
-                return (
-                  <g key={index}>
+            <div className="flex gap-2">
+              {/* Y axis: price scale (WETH per token), high at top / low at bottom. */}
+              <div className="flex w-24 flex-col justify-between py-1 text-right font-mono text-[9px] leading-none text-neutral-500">
+                {priceTicks.map((tick, i) => (
+                  <span key={i}>{formatAxisPrice(tick)}</span>
+                ))}
+              </div>
+              <div className="min-w-0 flex-1">
+                <svg
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  className="h-64 w-full"
+                  role="img"
+                  aria-label="V4 candlestick chart: price in WETH over time, green candles closed higher, red closed lower"
+                  onMouseLeave={() => setHoverIndex(null)}
+                >
+                  <defs>
+                    <linearGradient id="chart-grid-fade" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3f3f46" stopOpacity="0.5" />
+                      <stop offset="100%" stopColor="#3f3f46" stopOpacity="0.15" />
+                    </linearGradient>
+                  </defs>
+                  {/* Horizontal gridlines aligned with the price ticks on the left. */}
+                  {priceTicks.map((_, i) => (
                     <line
-                      x1={cx}
-                      x2={cx}
-                      y1={scale(candle.high)}
-                      y2={scale(candle.low)}
-                      stroke={color}
-                      strokeWidth="0.4"
+                      key={i}
+                      x1="0"
+                      x2="100"
+                      y1={(i / (priceTicks.length - 1)) * 92 + 4}
+                      y2={(i / (priceTicks.length - 1)) * 92 + 4}
+                      stroke="url(#chart-grid-fade)"
+                      strokeWidth="0.3"
                     />
-                    <rect
-                      x={cx - bodyWidth / 2}
-                      y={bodyTop}
-                      width={bodyWidth}
-                      height={bodyHeight}
-                      fill={color}
-                    />
-                  </g>
-                );
-              })}
-            </svg>
+                  ))}
+                  {candles.map((candle, index) => {
+                    const slot = 100 / candles.length;
+                    const cx = slot * (index + 0.5);
+                    const bodyWidth = slot * 0.55;
+                    const scale = (value: number) =>
+                      candleMax === candleMin ? 50 : 96 - ((value - candleMin) / (candleMax - candleMin)) * 88;
+                    const up = candle.close >= candle.open;
+                    const color = up ? "#10b981" : "#f43f5e";
+                    const yOpen = scale(candle.open);
+                    const yClose = scale(candle.close);
+                    const bodyTop = Math.min(yOpen, yClose);
+                    const bodyHeight = Math.max(Math.abs(yOpen - yClose), 0.8);
+                    const isHovered = hoverIndex === index;
+                    return (
+                      <g
+                        key={index}
+                        onMouseEnter={() => setHoverIndex(index)}
+                        onClick={() => setHoverIndex(index)}
+                        className="cursor-pointer"
+                        style={{ opacity: hoverIndex === null || isHovered ? 1 : 0.55 }}
+                      >
+                        {/* Wide invisible hit target so hovering/tapping anywhere in the
+                            candle's slot selects it, not just the thin wick/body. */}
+                        <rect x={cx - slot / 2} y={0} width={slot} height={100} fill="transparent" />
+                        {isHovered && (
+                          <line x1={cx} x2={cx} y1={0} y2={100} stroke="#71717a" strokeWidth="0.25" strokeDasharray="1.5,1.5" />
+                        )}
+                        <line
+                          x1={cx}
+                          x2={cx}
+                          y1={scale(candle.high)}
+                          y2={scale(candle.low)}
+                          stroke={color}
+                          strokeWidth="0.5"
+                          strokeLinecap="round"
+                        />
+                        <rect
+                          x={cx - bodyWidth / 2}
+                          y={bodyTop}
+                          width={bodyWidth}
+                          height={bodyHeight}
+                          rx={bodyWidth * 0.25}
+                          fill={color}
+                        />
+                      </g>
+                    );
+                  })}
+                </svg>
+                {/* X axis: real clock time under a spread of candles. */}
+                <div className="mt-1 flex justify-between font-mono text-[9px] text-neutral-500">
+                  {candleTimestamps
+                    .filter((_, i) => i % Math.max(1, Math.floor(candles.length / 6)) === 0)
+                    .map((ts, i) => (
+                      <span key={i}>{formatTime(ts)}</span>
+                    ))}
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex h-64 items-center justify-center text-sm text-neutral-500">
               Waiting for the first trade…
+            </div>
+          )}
+          {hoverCandle && (
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-neutral-400">
+              <span>O {formatPrice(hoverCandle.open)}</span>
+              <span>H {formatPrice(hoverCandle.high)}</span>
+              <span>L {formatPrice(hoverCandle.low)}</span>
+              <span>C {formatPrice(hoverCandle.close)}</span>
             </div>
           )}
         </div>

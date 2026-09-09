@@ -11,7 +11,6 @@ import { useAncientTokens } from "@/lib/ancient";
 import { usePad, useTokenPad } from "@/lib/hooks";
 import { useCurveStats, usePoolStats } from "@/lib/pool";
 import { formatUsd } from "@/lib/format";
-import { ActivityTabs } from "@/components/ActivityTabs";
 import { HarvestCard } from "@/components/HarvestCard";
 import { BondCard } from "@/components/BondCard";
 import { HolderRewardsCard } from "@/components/HolderRewardsCard";
@@ -245,7 +244,6 @@ export default function TokenPageClient() {
           bonded={resolved.bonded}
           progressBps={curve.progressBps}
         />
-        <ActivityTabs token={token} creator={creator} pool={pool} />
       </div>
 
       {/* RIGHT (1/3) */}
