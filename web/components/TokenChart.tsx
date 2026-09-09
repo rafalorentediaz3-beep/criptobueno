@@ -56,7 +56,7 @@ export function TokenChart({
 }) {
   const { chainId, weth } = usePad();
   const client = usePublicClient();
-  const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m">("Total");
+  const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m" | "1H" | "1D" | "1W">("Total");
   const hasPool = pool !== ZERO_ADDRESS && !isV4;
   // Only embed once GeckoTerminal has actually indexed the pool; a brand-new
   // pool would otherwise render GT's own 404 inside the iframe. Flips to the
@@ -123,28 +123,38 @@ export function TokenChart({
   // trading terminal timeframe switch.
   const CANDLE_COUNT = 36;
   const VISIBLE_CANDLES = 48;
-  const candles = useMemo(() => {
-    type Candle = { open: number; high: number; low: number; close: number };
-    if (v4Points.length === 0) return [] as Candle[];
+  type Candle = { open: number; high: number; low: number; close: number };
+
+  // Full-resolution candle series: for "Total" this is the whole history
+  // squashed into CANDLE_COUNT buckets (no panning needed, you already see
+  // everything). For "5m"/"15m" this is the *entire* trade history bucketed
+  // at that real candle width — panning below just slides a viewing window
+  // over it, Axiom-style, so scrolling left reveals older candles instead of
+  // re-fetching anything.
+  const { fullCandles, fullTimestamps } = useMemo(() => {
+    if (v4Points.length === 0) return { fullCandles: [] as Candle[], fullTimestamps: [] as number[] };
     type Bucket = { open?: number; high: number; low: number; close?: number };
+    const minTs = v4Points[0].timestamp;
+    const maxTs = v4Points[v4Points.length - 1].timestamp;
     let bucketCount: number;
-    let bucketIndex: (timestamp: number) => number;
+    let bucketWidth: number;
+    let anchor: number;
     if (interval === "Total") {
-      const minTs = v4Points[0].timestamp;
-      const maxTs = v4Points[v4Points.length - 1].timestamp;
       const span = Math.max(maxTs - minTs, 1);
       bucketCount = CANDLE_COUNT;
-      bucketIndex = (ts) => Math.min(CANDLE_COUNT - 1, Math.max(0, Math.floor(((ts - minTs) / span) * CANDLE_COUNT)));
+      bucketWidth = span / CANDLE_COUNT;
+      anchor = minTs;
     } else {
-      const intervalSeconds = interval === "5m" ? 300 : 900;
-      const windowStart = latestTs - VISIBLE_CANDLES * intervalSeconds;
-      bucketCount = VISIBLE_CANDLES;
-      bucketIndex = (ts) => Math.min(VISIBLE_CANDLES - 1, Math.max(0, Math.floor((ts - windowStart) / intervalSeconds)));
+      bucketWidth =
+        interval === "5m" ? 300 : interval === "15m" ? 900 : interval === "1H" ? 3_600 : interval === "1D" ? 86_400 : 604_800;
+      anchor = minTs;
+      bucketCount = Math.max(VISIBLE_CANDLES, Math.floor((maxTs - minTs) / bucketWidth) + 1);
     }
+    const bucketIndex = (ts: number) =>
+      Math.min(bucketCount - 1, Math.max(0, Math.floor((ts - anchor) / bucketWidth)));
     const buckets: Bucket[] = Array.from({ length: bucketCount }, () => ({ high: -Infinity, low: Infinity }));
     for (const point of v4Points) {
-      const idx = bucketIndex(point.timestamp);
-      const bucket = buckets[idx];
+      const bucket = buckets[bucketIndex(point.timestamp)];
       if (bucket.open === undefined) bucket.open = point.price;
       bucket.close = point.price;
       bucket.high = Math.max(bucket.high, point.price);
@@ -159,40 +169,60 @@ export function TokenChart({
       lastClose = bucket.close;
       return { open: bucket.open, high: bucket.high, low: bucket.low, close: bucket.close! };
     });
-    // Drop the leading gap before the first real trade in range.
     const firstReal = filled.findIndex((c) => c !== null);
-    return firstReal === -1 ? [] : (filled.slice(firstReal) as Candle[]);
-  }, [v4Points, interval, latestTs]);
+    if (firstReal === -1) return { fullCandles: [] as Candle[], fullTimestamps: [] as number[] };
+    const trimmed = filled.slice(firstReal) as Candle[];
+    const timestamps = trimmed.map((_, i) => anchor + (firstReal + i + 0.5) * bucketWidth);
+    return { fullCandles: trimmed, fullTimestamps: timestamps };
+  }, [v4Points, interval]);
 
-  const candleMin = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : 0;
-  const candleMax = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 0;
+  // Pan offset in candles, counted back from the live edge (0 = latest).
+  // Reset whenever the interval changes so switching timeframes always
+  // starts at the live edge.
+  const [panOffset, setPanOffset] = useState(0);
+  const canPanForTimeframe = interval !== "Total";
+  const maxPanOffset = canPanForTimeframe ? Math.max(0, fullCandles.length - VISIBLE_CANDLES) : 0;
+  const clampedPan = Math.min(panOffset, maxPanOffset);
+  const windowSize = canPanForTimeframe ? VISIBLE_CANDLES : fullCandles.length;
+  const windowStart = Math.max(0, fullCandles.length - windowSize - clampedPan);
+  const candles = fullCandles.slice(windowStart, windowStart + windowSize);
+  const candleTimestamps = fullTimestamps.slice(windowStart, windowStart + windowSize);
+  const atLiveEdge = clampedPan === 0;
+  const atOldestEdge = clampedPan >= maxPanOffset;
+  const panBack = () => setPanOffset((p) => Math.min(maxPanOffset, p + Math.round(VISIBLE_CANDLES / 2)));
+  const panForward = () => setPanOffset((p) => Math.max(0, p - Math.round(VISIBLE_CANDLES / 2)));
+  const goLive = () => setPanOffset(0);
+
+  const rawCandleMin = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : 0;
+  const rawCandleMax = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 0;
+
+  // Vertical (price / market-cap) zoom: 1 = fit the visible range exactly;
+  // >1 narrows the range around its midpoint so candles read taller/bigger;
+  // <1 widens it so candles read shorter/smaller — same idea as Axiom's
+  // scroll-to-zoom on the price axis, exposed here as +/- buttons.
+  const [zoomY, setZoomY] = useState(1);
+  const zoomIn = () => setZoomY((z) => Math.min(8, z * 1.4));
+  const zoomOut = () => setZoomY((z) => Math.max(0.25, z / 1.4));
+  const zoomReset = () => setZoomY(1);
+  const rawSpan = Math.max(rawCandleMax - rawCandleMin, rawCandleMax * 0.0005, 1e-18);
+  const mid = (rawCandleMax + rawCandleMin) / 2;
+  const half = rawSpan / 2 / zoomY;
+  const candleMin = mid - half;
+  const candleMax = mid + half;
+
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const hoverCandle = hoverIndex !== null ? candles[hoverIndex] : undefined;
   const formatPrice = (value: number) => `${value.toFixed(12)} WETH`;
   // Short axis label for a compact price tick, e.g. "0.0000000030".
   const formatAxisPrice = (value: number) => value.toFixed(10);
-  const formatTime = (ts: number) =>
-    ts > 0
-      ? new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      : "";
-
-  // Timestamp per candle, so the X axis can show real clock times instead of
-  // meaningless bar indexes — same bucketing as the candles above.
-  const candleTimestamps = useMemo(() => {
-    if (candles.length === 0) return [] as number[];
-    if (interval === "Total") {
-      if (v4Points.length === 0) return candles.map(() => 0);
-      const minTs = v4Points[0].timestamp;
-      const maxTs = v4Points[v4Points.length - 1].timestamp;
-      const span = Math.max(maxTs - minTs, 1);
-      const offset = CANDLE_COUNT - candles.length;
-      return candles.map((_, i) => minTs + ((i + offset + 0.5) / CANDLE_COUNT) * span);
+  const formatTime = (ts: number) => {
+    if (ts <= 0) return "";
+    const date = new Date(ts * 1000);
+    if (interval === "1D" || interval === "1W" || interval === "Total") {
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
-    const intervalSeconds = interval === "5m" ? 300 : 900;
-    const windowStart = latestTs - VISIBLE_CANDLES * intervalSeconds;
-    const offset = VISIBLE_CANDLES - candles.length;
-    return candles.map((_, i) => windowStart + (i + offset + 0.5) * intervalSeconds);
-  }, [candles, v4Points, interval, latestTs]);
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
 
   // 4 evenly spaced price ticks from top (high) to bottom (low) of the visible range.
   const priceTicks = useMemo(() => {
@@ -248,17 +278,83 @@ export function TokenChart({
                 </span>
               </span>
             </div>
-            <div className="flex gap-1">
-              {(["Total", "5m", "15m"] as const).map((item) => (
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {/* Timeframe switch — same idea as Axiom's row of candle widths. */}
+              <div className="flex gap-1">
+                {(["Total", "5m", "15m", "1H", "1D", "1W"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => {
+                      setIntervalOption(item);
+                      setPanOffset(0);
+                    }}
+                    className={`rounded px-2 py-1 text-[10px] ${interval === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              {/* Pan controls: scroll back through history / jump back to live,
+                  like dragging Axiom's chart left and right. */}
+              <div className="flex items-center gap-1 border-l border-neutral-800 pl-1">
                 <button
-                  key={item}
                   type="button"
-                  onClick={() => setIntervalOption(item)}
-                  className={`rounded px-2 py-1 text-[10px] ${interval === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                  onClick={panBack}
+                  disabled={!canPanForTimeframe || atOldestEdge}
+                  title="Older candles"
+                  className="rounded bg-neutral-800 px-1.5 py-1 text-[10px] text-neutral-400 disabled:opacity-30"
                 >
-                  {item}
+                  ◀
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={goLive}
+                  disabled={!canPanForTimeframe || atLiveEdge}
+                  title="Jump to live"
+                  className="rounded bg-neutral-800 px-1.5 py-1 text-[9px] uppercase text-neutral-400 disabled:opacity-30"
+                >
+                  Live
+                </button>
+                <button
+                  type="button"
+                  onClick={panForward}
+                  disabled={!canPanForTimeframe || atLiveEdge}
+                  title="Newer candles"
+                  className="rounded bg-neutral-800 px-1.5 py-1 text-[10px] text-neutral-400 disabled:opacity-30"
+                >
+                  ▶
+                </button>
+              </div>
+              {/* Vertical zoom: squeeze/stretch the price (market cap) axis so
+                  candles read bigger or smaller, same as scrolling on Axiom's
+                  price axis. */}
+              <div className="flex items-center gap-1 border-l border-neutral-800 pl-1">
+                <button
+                  type="button"
+                  onClick={zoomOut}
+                  title="Zoom out price axis"
+                  className="rounded bg-neutral-800 px-1.5 py-1 text-[11px] text-neutral-400"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={zoomReset}
+                  title="Reset zoom"
+                  className="rounded bg-neutral-800 px-1.5 py-1 text-[9px] uppercase text-neutral-400"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={zoomIn}
+                  title="Zoom in price axis"
+                  className="rounded bg-neutral-800 px-1.5 py-1 text-[11px] text-neutral-400"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
           {candles.length > 0 ? (
