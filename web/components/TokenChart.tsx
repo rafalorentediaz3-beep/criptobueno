@@ -182,7 +182,6 @@ export function TokenChart({
 
   const marketCap = (p: number) => p * TOTAL_SUPPLY_WHOLE;
   const formatBigUsd = (ethAmount: number) => (ethUsd ? formatUsd(ethAmount * ethUsd) : `${ethAmount.toFixed(8)} WETH`);
-  const formatPrice = (value: number) => `${value.toFixed(12)} WETH`;
   const formatDateTime = (ts: number) =>
     ts && ts > 0
       ? new Date(ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -448,15 +447,6 @@ export function TokenChart({
               {trendUp ? "Up" : "Down"} this window
             </span>
           </div>
-
-          {hoverCandle && (
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-neutral-400">
-              <span>O {formatPrice(hoverCandle.open)}</span>
-              <span>H {formatPrice(hoverCandle.high)}</span>
-              <span>L {formatPrice(hoverCandle.low)}</span>
-              <span>C {formatPrice(hoverCandle.close)}</span>
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex h-56 flex-col items-center justify-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950 text-center">
