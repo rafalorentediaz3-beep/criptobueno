@@ -1,7 +1,7 @@
 "use client";
 
 import { CandlestickChart, ExternalLink, Sprout } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { decodeEventLog, parseAbiItem } from "viem";
 import type { Address, Hex } from "viem";
 import { usePublicClient } from "wagmi";
@@ -56,7 +56,7 @@ export function TokenChart({
 }) {
   const { chainId } = usePad();
   const client = usePublicClient();
-  const [range, setRange] = useState<"1H" | "6H" | "1D">("1D");
+  const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m">("Total");
   const hasPool = pool !== ZERO_ADDRESS && !isV4;
   // Only embed once GeckoTerminal has actually indexed the pool; a brand-new
   // pool would otherwise render GT's own 404 inside the iframe. Flips to the
@@ -71,53 +71,108 @@ export function TokenChart({
   // A bonded curve is 100% by definition, regardless of the live pool tick.
   const barBps = bonded ? 10_000n : progressBps;
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
+  // Fixed, generous lookback so switching between Total/5m/15m never needs a
+  // refetch — only the client-side bucketing below changes with `interval`.
+  const FETCH_BLOCKS = 5_000_000n;
   const v4HistoryQuery = useQuery({
-    queryKey: ["v4-chart", chainId, poolId, range],
+    queryKey: ["v4-chart", chainId, poolId],
     enabled: isV4 && !!poolId && !!client,
-    refetchInterval: 15_000,
+    // Poll every second so the candles feel truly live, like a real trading terminal.
+    refetchInterval: 1_000,
     queryFn: async () => {
-      if (!client || !poolId) return [];
+      if (!client || !poolId) return { points: [], latestTs: 0 };
       const latest = await client.getBlockNumber();
-      // Robinhood Chain produces a block roughly every ~0.1s (~10/s), not the
-      // ~3s of most L2s/L1s a naive guess would assume — using that wrong
-      // assumption made "1D" cover only ~48 real minutes and miss all swaps.
-      const blocks = range === "1H" ? 36_000n : range === "6H" ? 216_000n : 864_000n;
       const logs = await client.getLogs({
         address: v4Manager,
         event: v4SwapEvent,
         args: { id: poolId },
-        fromBlock: latest > blocks ? latest - blocks : 0n,
+        fromBlock: latest > FETCH_BLOCKS ? latest - FETCH_BLOCKS : 0n,
         toBlock: latest,
       });
-      return logs
+      const uniqueBlocks = Array.from(new Set(logs.map((log) => log.blockNumber ?? 0n)));
+      const blockEntries = await Promise.all(
+        uniqueBlocks.map(async (blockNumber) => {
+          const block = await client.getBlock({ blockNumber });
+          return [blockNumber, Number(block.timestamp)] as const;
+        }),
+      );
+      const timestampByBlock = new Map(blockEntries);
+      const latestBlock = await client.getBlock({ blockNumber: latest });
+      const points = logs
         .map((log) => {
           const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });
           return {
-            block: log.blockNumber ?? 0n,
+            timestamp: timestampByBlock.get(log.blockNumber ?? 0n) ?? 0,
             price: priceWethPerToken(
               decoded.args.sqrtPriceX96,
               tokenIsToken0(token, "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"),
             ),
           };
         })
-        .filter((point) => point.price > 0);
+        .filter((point) => point.price > 0)
+        .sort((a, b) => a.timestamp - b.timestamp);
+      return { points, latestTs: Number(latestBlock.timestamp) };
     },
   });
-  const v4Points = v4HistoryQuery.data ?? [];
-  const chartPrices = v4Points.length > 0 ? v4Points.map((p) => p.price) : priceWeth > 0 ? [priceWeth] : [];
-  const chartMin = Math.min(...chartPrices);
-  const chartMax = Math.max(...chartPrices);
-  const chartPath = chartPrices
-    .map((value, index) => {
-      const x = chartPrices.length === 1 ? 50 : (index / (chartPrices.length - 1)) * 100;
-      const y = chartMax === chartMin ? 50 : 92 - ((value - chartMin) / (chartMax - chartMin)) * 84;
-      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
+  const v4Points = v4HistoryQuery.data?.points ?? [];
+  const latestTs = v4HistoryQuery.data?.latestTs ?? 0;
+
+  // Bucket raw swap prices into fixed-width candles (Axiom/TradingView style):
+  // open/close/high/low per bucket, green when it closed up, red when down.
+  // Empty buckets (no trade that slice) carry the previous close forward flat,
+  // so the chart reads as one continuous series instead of gaps.
+  // "Total" spreads every trade evenly across the whole history; "5m"/"15m"
+  // use real wall-clock candle widths over a trailing window, like a normal
+  // trading terminal timeframe switch.
+  const CANDLE_COUNT = 36;
+  const VISIBLE_CANDLES = 48;
+  const candles = useMemo(() => {
+    type Candle = { open: number; high: number; low: number; close: number };
+    if (v4Points.length === 0) return [] as Candle[];
+    type Bucket = { open?: number; high: number; low: number; close?: number };
+    let bucketCount: number;
+    let bucketIndex: (timestamp: number) => number;
+    if (interval === "Total") {
+      const minTs = v4Points[0].timestamp;
+      const maxTs = v4Points[v4Points.length - 1].timestamp;
+      const span = Math.max(maxTs - minTs, 1);
+      bucketCount = CANDLE_COUNT;
+      bucketIndex = (ts) => Math.min(CANDLE_COUNT - 1, Math.max(0, Math.floor(((ts - minTs) / span) * CANDLE_COUNT)));
+    } else {
+      const intervalSeconds = interval === "5m" ? 300 : 900;
+      const windowStart = latestTs - VISIBLE_CANDLES * intervalSeconds;
+      bucketCount = VISIBLE_CANDLES;
+      bucketIndex = (ts) => Math.min(VISIBLE_CANDLES - 1, Math.max(0, Math.floor((ts - windowStart) / intervalSeconds)));
+    }
+    const buckets: Bucket[] = Array.from({ length: bucketCount }, () => ({ high: -Infinity, low: Infinity }));
+    for (const point of v4Points) {
+      const idx = bucketIndex(point.timestamp);
+      const bucket = buckets[idx];
+      if (bucket.open === undefined) bucket.open = point.price;
+      bucket.close = point.price;
+      bucket.high = Math.max(bucket.high, point.price);
+      bucket.low = Math.min(bucket.low, point.price);
+    }
+    let lastClose: number | undefined;
+    const filled = buckets.map((bucket) => {
+      if (bucket.open === undefined) {
+        if (lastClose === undefined) return null;
+        return { open: lastClose, high: lastClose, low: lastClose, close: lastClose };
+      }
+      lastClose = bucket.close;
+      return { open: bucket.open, high: bucket.high, low: bucket.low, close: bucket.close! };
+    });
+    // Drop the leading gap before the first real trade in range.
+    const firstReal = filled.findIndex((c) => c !== null);
+    return firstReal === -1 ? [] : (filled.slice(firstReal) as Candle[]);
+  }, [v4Points, interval, latestTs]);
+
+  const candleMin = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : 0;
+  const candleMax = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 0;
 
   return (
-    <section className="card p-4 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="card p-4 pt-5 sm:p-6 sm:pt-6">
+      <div className="mb-5 flex items-center justify-between">
         <h2 className="flex items-center gap-2 font-semibold text-neutral-100">
           <CandlestickChart className="h-4 w-4 text-amber-500" />
           Price Chart
@@ -145,42 +200,72 @@ export function TokenChart({
             allowFullScreen
           />
         </div>
+      ) : isV4 ? (
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+          <div className="mb-2 flex items-center justify-end gap-1">
+            {(["Total", "5m", "15m"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setIntervalOption(item)}
+                className={`rounded px-2 py-1 text-[10px] ${interval === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          {candles.length > 0 ? (
+            <svg viewBox="0 0 100 100" className="h-64 w-full" role="img" aria-label="V4 candlestick chart">
+              <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#27272a" strokeWidth="0.3" />
+              {candles.map((candle, index) => {
+                const slot = 100 / candles.length;
+                const cx = slot * (index + 0.5);
+                const bodyWidth = slot * 0.6;
+                const scale = (value: number) =>
+                  candleMax === candleMin ? 50 : 92 - ((value - candleMin) / (candleMax - candleMin)) * 84;
+                const up = candle.close >= candle.open;
+                const color = up ? "#22c55e" : "#ef4444";
+                const yOpen = scale(candle.open);
+                const yClose = scale(candle.close);
+                const bodyTop = Math.min(yOpen, yClose);
+                const bodyHeight = Math.max(Math.abs(yOpen - yClose), 0.6);
+                return (
+                  <g key={index}>
+                    <line
+                      x1={cx}
+                      x2={cx}
+                      y1={scale(candle.high)}
+                      y2={scale(candle.low)}
+                      stroke={color}
+                      strokeWidth="0.4"
+                    />
+                    <rect
+                      x={cx - bodyWidth / 2}
+                      y={bodyTop}
+                      width={bodyWidth}
+                      height={bodyHeight}
+                      fill={color}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            <div className="flex h-64 items-center justify-center text-sm text-neutral-500">
+              Waiting for the first trade…
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex h-56 flex-col items-center justify-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950 text-center">
-          {indexing && (
+          {indexing ? (
             <>
               <CandlestickChart className="h-8 w-8 text-amber-500/60" aria-hidden />
               <p className="max-w-xs text-sm text-neutral-400">
                 Fresh launch — GeckoTerminal is still indexing this pool. The chart appears here automatically within a few minutes. It's already live and tradable.
               </p>
             </>
-          )}
-          {isV4 && (
-            <div className="w-full max-w-3xl rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="font-mono text-sm text-amber-400">
-                  {priceWeth > 0 ? `${priceWeth.toFixed(12)} WETH` : "Loading price…"}
-                </span>
-                <div className="flex gap-1">
-                  {(["1H", "6H", "1D"] as const).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setRange(item)}
-                      className={`rounded px-2 py-1 text-[10px] ${range === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <svg viewBox="0 0 100 100" className="h-44 w-full" role="img" aria-label="V4 price chart">
-                <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#27272a" strokeWidth="0.5" />
-                {chartPath && <path d={chartPath} fill="none" stroke="#f2b90f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
-              </svg>
-            </div>
-          )}
-          {!isV4 && !indexing && (
+          ) : (
             <p className="max-w-xs text-sm text-neutral-400">
               This token trades live on Uniswap V3. A price chart isn't indexed on this network yet.
             </p>
