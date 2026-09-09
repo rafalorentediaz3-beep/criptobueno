@@ -1,7 +1,7 @@
 "use client";
 
 import { CandlestickChart, ExternalLink, Sprout } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { decodeEventLog, parseAbiItem } from "viem";
 import type { Address, Hex } from "viem";
 import { usePublicClient } from "wagmi";
@@ -57,6 +57,10 @@ export function TokenChart({
   const { chainId, weth } = usePad();
   const client = usePublicClient();
   const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m" | "1H" | "1D" | "1W">("Total");
+  // How often the chart re-polls the chain for new swaps — selectable like
+  // Axiom's refresh cadence, not tied to the candle timeframe above.
+  const REFRESH_OPTIONS = { "15s": 15_000, "1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000 } as const;
+  const [refreshLabel, setRefreshLabel] = useState<keyof typeof REFRESH_OPTIONS>("15s");
   const hasPool = pool !== ZERO_ADDRESS && !isV4;
   // Only embed once GeckoTerminal has actually indexed the pool; a brand-new
   // pool would otherwise render GT's own 404 inside the iframe. Flips to the
@@ -71,44 +75,77 @@ export function TokenChart({
   // A bonded curve is 100% by definition, regardless of the live pool tick.
   const barBps = bonded ? 10_000n : progressBps;
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
-  // Fixed, generous lookback so switching between Total/5m/15m never needs a
-  // refetch — only the client-side bucketing below changes with `interval`.
+  // One-time backfill depth when a pool is first opened. After that, every
+  // poll only asks for blocks strictly newer than the last one we've already
+  // fetched (see cache below) — NOT this whole range again.
   const FETCH_BLOCKS = 5_000_000n;
+  // Accumulates swap points across polls so each tick only has to fetch the
+  // handful of blocks produced since the last tick, instead of re-scanning
+  // millions of blocks every time. Keyed by pool so switching tokens resets it.
+  // This was the actual cause of pages hanging: re-running a 5,000,000-block
+  // getLogs every second, from every open tab, blew through the shared RPC
+  // rate limit and starved the rest of the site.
+  const chartCacheRef = useRef<{
+    key: string;
+    points: { timestamp: number; price: number }[];
+    lastBlock: bigint;
+    blockTsCache: Map<string, number>;
+  } | null>(null);
   const v4HistoryQuery = useQuery({
     queryKey: ["v4-chart", chainId, poolId, weth],
     enabled: isV4 && !!poolId && !!client,
-    // Poll every second so the candles feel truly live, like a real trading terminal.
-    refetchInterval: 1_000,
+    // Selectable cadence (default 15s) — each tick is a cheap incremental
+    // fetch (only blocks since the last poll), not a full history re-scan.
+    refetchInterval: REFRESH_OPTIONS[refreshLabel],
     queryFn: async () => {
       if (!client || !poolId) return { points: [], latestTs: 0 };
+      const cacheKey = `${chainId}:${poolId}:${weth}`;
+      let cache = chartCacheRef.current;
+      if (!cache || cache.key !== cacheKey) {
+        cache = { key: cacheKey, points: [], lastBlock: -1n, blockTsCache: new Map() };
+        chartCacheRef.current = cache;
+      }
       const latest = await client.getBlockNumber();
-      const logs = await client.getLogs({
-        address: v4Manager,
-        event: v4SwapEvent,
-        args: { id: poolId },
-        fromBlock: latest > FETCH_BLOCKS ? latest - FETCH_BLOCKS : 0n,
-        toBlock: latest,
-      });
-      const uniqueBlocks = Array.from(new Set(logs.map((log) => log.blockNumber ?? 0n)));
-      const blockEntries = await Promise.all(
-        uniqueBlocks.map(async (blockNumber) => {
-          const block = await client.getBlock({ blockNumber });
-          return [blockNumber, Number(block.timestamp)] as const;
-        }),
-      );
-      const timestampByBlock = new Map(blockEntries);
+      const fromBlock =
+        cache.lastBlock < 0n ? (latest > FETCH_BLOCKS ? latest - FETCH_BLOCKS : 0n) : cache.lastBlock + 1n;
+      if (fromBlock <= latest) {
+        const logs = await client.getLogs({
+          address: v4Manager,
+          event: v4SwapEvent,
+          args: { id: poolId },
+          fromBlock,
+          toBlock: latest,
+        });
+        if (logs.length > 0) {
+          const uniqueBlocks = Array.from(new Set(logs.map((log) => log.blockNumber ?? 0n))).filter(
+            (b) => !cache!.blockTsCache.has(b.toString()),
+          );
+          const blockEntries = await Promise.all(
+            uniqueBlocks.map(async (blockNumber) => {
+              const block = await client.getBlock({ blockNumber });
+              return [blockNumber, Number(block.timestamp)] as const;
+            }),
+          );
+          for (const [blockNumber, ts] of blockEntries) cache.blockTsCache.set(blockNumber.toString(), ts);
+          const newPoints = logs
+            .map((log) => {
+              const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });
+              return {
+                timestamp: cache!.blockTsCache.get((log.blockNumber ?? 0n).toString()) ?? 0,
+                price: priceWethPerToken(decoded.args.sqrtPriceX96, tokenIsToken0(token, weth)),
+              };
+            })
+            // A missing/failed block timestamp lookup would default to 0 and
+            // corrupt the whole time axis (huge fake time span → the chart
+            // tries to allocate millions of candle buckets and the tab hangs),
+            // so drop anything without a real timestamp.
+            .filter((point) => point.price > 0 && point.timestamp > 0);
+          cache.points = [...cache.points, ...newPoints].sort((a, b) => a.timestamp - b.timestamp);
+        }
+        cache.lastBlock = latest;
+      }
       const latestBlock = await client.getBlock({ blockNumber: latest });
-      const points = logs
-        .map((log) => {
-          const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });
-          return {
-            timestamp: timestampByBlock.get(log.blockNumber ?? 0n) ?? 0,
-            price: priceWethPerToken(decoded.args.sqrtPriceX96, tokenIsToken0(token, weth)),
-          };
-        })
-        .filter((point) => point.price > 0)
-        .sort((a, b) => a.timestamp - b.timestamp);
-      return { points, latestTs: Number(latestBlock.timestamp) };
+      return { points: cache.points, latestTs: Number(latestBlock.timestamp) };
     },
   });
   const v4Points = v4HistoryQuery.data?.points ?? [];
@@ -148,7 +185,11 @@ export function TokenChart({
       bucketWidth =
         interval === "5m" ? 300 : interval === "15m" ? 900 : interval === "1H" ? 3_600 : interval === "1D" ? 86_400 : 604_800;
       anchor = minTs;
-      bucketCount = Math.max(VISIBLE_CANDLES, Math.floor((maxTs - minTs) / bucketWidth) + 1);
+      // Safety cap: however wide the real span turns out to be, never try to
+      // allocate more than this many buckets — a bad timestamp shouldn't be
+      // able to freeze the tab by requesting millions of empty buckets.
+      const MAX_BUCKETS = 20_000;
+      bucketCount = Math.min(MAX_BUCKETS, Math.max(VISIBLE_CANDLES, Math.floor((maxTs - minTs) / bucketWidth) + 1));
     }
     const bucketIndex = (ts: number) =>
       Math.min(bucketCount - 1, Math.max(0, Math.floor((ts - anchor) / bucketWidth)));
@@ -279,8 +320,23 @@ export function TokenChart({
               </span>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-1">
+              {/* Refresh cadence — how often the chart re-polls the chain,
+                  independent from the candle timeframe below. */}
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] uppercase text-neutral-600">Refresh</span>
+                {(Object.keys(REFRESH_OPTIONS) as Array<keyof typeof REFRESH_OPTIONS>).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setRefreshLabel(item)}
+                    className={`rounded px-1.5 py-1 text-[10px] ${refreshLabel === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
               {/* Timeframe switch — same idea as Axiom's row of candle widths. */}
-              <div className="flex gap-1">
+              <div className="flex gap-1 border-l border-neutral-800 pl-1">
                 {(["Total", "5m", "15m", "1H", "1D", "1W"] as const).map((item) => (
                   <button
                     key={item}
@@ -416,9 +472,6 @@ export function TokenChart({
                         {/* Wide invisible hit target so hovering/tapping anywhere in the
                             candle's slot selects it, not just the thin wick/body. */}
                         <rect x={cx - slot / 2} y={0} width={slot} height={100} fill="transparent" />
-                        {isHovered && (
-                          <line x1={cx} x2={cx} y1={0} y2={100} stroke="#71717a" strokeWidth="0.25" strokeDasharray="1.5,1.5" />
-                        )}
                         <line
                           x1={cx}
                           x2={cx}
