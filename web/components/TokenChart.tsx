@@ -78,7 +78,10 @@ export function TokenChart({
     queryFn: async () => {
       if (!client || !poolId) return [];
       const latest = await client.getBlockNumber();
-      const blocks = range === "1H" ? 1_200n : range === "6H" ? 7_200n : 28_800n;
+      // Robinhood Chain produces a block roughly every ~0.1s (~10/s), not the
+      // ~3s of most L2s/L1s a naive guess would assume — using that wrong
+      // assumption made "1D" cover only ~48 real minutes and miss all swaps.
+      const blocks = range === "1H" ? 36_000n : range === "6H" ? 216_000n : 864_000n;
       const logs = await client.getLogs({
         address: v4Manager,
         event: v4SwapEvent,
@@ -144,14 +147,14 @@ export function TokenChart({
         </div>
       ) : (
         <div className="flex h-56 flex-col items-center justify-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950 text-center">
-          <CandlestickChart className="h-8 w-8 text-amber-500/60" aria-hidden />
-          <p className="max-w-xs text-sm text-neutral-400">
-            {indexing
-              ? "Fresh launch — GeckoTerminal is still indexing this pool. The chart appears here automatically within a few minutes. It's already live and tradable."
-              : isV4
-                ? "This token trades live on Uniswap V4. GeckoTerminal does not provide an indexed chart for this PoolManager pool yet."
-                : "This token trades live on Uniswap V3. A price chart isn't indexed on this network yet."}
-          </p>
+          {indexing && (
+            <>
+              <CandlestickChart className="h-8 w-8 text-amber-500/60" aria-hidden />
+              <p className="max-w-xs text-sm text-neutral-400">
+                Fresh launch — GeckoTerminal is still indexing this pool. The chart appears here automatically within a few minutes. It's already live and tradable.
+              </p>
+            </>
+          )}
           {isV4 && (
             <div className="w-full max-w-3xl rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left shadow-sm">
               <div className="mb-2 flex items-center justify-between">
@@ -175,8 +178,12 @@ export function TokenChart({
                 <path d="M 0 92 H 100 M 0 50 H 100 M 0 8 H 100" stroke="#27272a" strokeWidth="0.5" />
                 {chartPath && <path d={chartPath} fill="none" stroke="#f2b90f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
               </svg>
-              <p className="mt-1 text-[10px] text-neutral-500">On-chain Uniswap V4 swaps · updates every 15 seconds</p>
             </div>
+          )}
+          {!isV4 && !indexing && (
+            <p className="max-w-xs text-sm text-neutral-400">
+              This token trades live on Uniswap V3. A price chart isn't indexed on this network yet.
+            </p>
           )}
           <a
             href={uniswapSwapUrl(token, chainId)}
