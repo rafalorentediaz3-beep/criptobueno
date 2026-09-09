@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { getAddress, isAddress, type Address } from "viem";
-import { formatUsd, shortAddress, timeAgo } from "@/lib/format";
+import { type Address } from "viem";
+import { formatUsd, timeAgo } from "@/lib/format";
 import { useEthUsdPrice } from "@/lib/price";
 import { TokenAvatar } from "@/components/TokenAvatar";
 
@@ -39,15 +39,6 @@ export interface TokenRow {
   lastBuyAt?: number;
 }
 
-function creatorHref(creator: Address): string | null {
-  if (!isAddress(creator)) return null;
-  try {
-    return `/creator/${getAddress(creator)}`;
-  } catch {
-    return null;
-  }
-}
-
 const cardShell =
   "group card-enter relative flex flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.6)] transition-all duration-200 hover:-translate-y-0.5 hover:border-neutral-700 hover:shadow-[0_16px_30px_-16px_rgba(0,0,0,0.6)]";
 
@@ -70,13 +61,6 @@ export function TokenCard({
       ? row.marketCapEth * ethUsd
       : 0;
   const mc = mcapUsd > 0 ? formatUsd(mcapUsd) : "—";
-  const profile = !hideCreatorLink && !row.ancient ? creatorHref(row.creator) : null;
-  // Prefer the planter's profile name; fall back to the raw address in mono.
-  const byLabel = row.creatorName ? (
-    row.creatorName
-  ) : (
-    <span className="font-mono">{shortAddress(row.creator)}</span>
-  );
 
   // ── Ancient card: image, name, MC + 24h VOL, Ancient tag ──
   if (row.ancient) {
@@ -177,31 +161,10 @@ export function TokenCard({
                   <span>🎓 Bond</span>
                 </div>
               </div>
-            ) : (
-              <div className="truncate font-mono text-[9px] text-neutral-500">
-                {shortAddress(row.address)}
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </Link>
-      {/* Sibling link (not nested): open planter profile without leaving token nav. */}
-      {profile ? (
-        <div className="border-t border-neutral-800 px-3 py-2">
-          <Link
-            href={profile}
-            className="block truncate text-[10px] text-neutral-500 transition-colors hover:text-neutral-200 focus-visible:text-neutral-200 focus-visible:outline-none"
-          >
-            by {byLabel}
-          </Link>
-        </div>
-      ) : (
-        <div className="border-t border-neutral-800 px-3 py-2">
-          <span className="block truncate text-[10px] text-neutral-500">
-            by {byLabel}
-          </span>
-        </div>
-      )}
     </article>
   );
 }
