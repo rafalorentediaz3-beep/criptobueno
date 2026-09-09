@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, parseAbiItem, type Address } from "viem";
 import { robinhoodServerTransport } from "@/lib/serverRpc";
-import { allPadDeployments, robinhoodChain, ZERO_ADDRESS } from "@/lib/config";
+import { allPadDeployments, curvePadDeployment, padDeployments, robinhoodChain, v4PadDeployment, ZERO_ADDRESS } from "@/lib/config";
 
 /**
  * Server-side, cached holder list for a single token.
@@ -122,6 +122,26 @@ function earliestPadBlock(): bigint {
     : 0n;
 }
 
+/**
+ * When the caller knows which pad launched the token (curve/direct/v4), scope
+ * the scan to just that pad's own start block instead of the global earliest
+ * one. The V4 pad in particular launched long after the curve/direct pads, so
+ * without this a V4 token's holder scan pointlessly re-walked millions of
+ * blocks that predate V4 entirely — enough getLogs chunks to time out and
+ * fall back to "unavailable" every time.
+ */
+function startBlockForKind(kind: string | null): bigint {
+  if (kind === "v4") return v4PadDeployment(robinhoodChain.id)?.startBlock ?? earliestPadBlock();
+  if (kind === "curve") return curvePadDeployment(robinhoodChain.id)?.startBlock ?? earliestPadBlock();
+  if (kind === "direct") {
+    const directs = padDeployments(robinhoodChain.id);
+    return directs.length
+      ? directs.reduce((m, p) => (p.startBlock < m ? p.startBlock : m), directs[0].startBlock)
+      : earliestPadBlock();
+  }
+  return earliestPadBlock();
+}
+
 function buildPayload(balances: Map<string, bigint>): HoldersPayload {
   const positive = Array.from(balances.entries())
     .filter(([, balance]) => balance > 0n)
@@ -138,14 +158,14 @@ function buildPayload(balances: Map<string, bigint>): HoldersPayload {
 }
 
 /** Scan new blocks since the token's last refresh (full history on first call). */
-async function refresh(key: string, token: Address): Promise<HoldersPayload> {
+async function refresh(key: string, token: Address, startBlock: bigint): Promise<HoldersPayload> {
   const inflight = scanning.get(key);
   if (inflight) return inflight;
 
   const p = (async () => {
     const latest = await client.getBlockNumber();
     const prev = state.get(key);
-    const fromBlock = prev ? prev.lastScanned + 1n : earliestPadBlock();
+    const fromBlock = prev ? prev.lastScanned + 1n : startBlock;
     const balances = prev ? prev.balances : new Map<string, bigint>();
 
     if (fromBlock <= latest) {
@@ -184,11 +204,14 @@ async function refresh(key: string, token: Address): Promise<HoldersPayload> {
 }
 
 export async function GET(req: Request) {
-  const token = new URL(req.url).searchParams.get("token");
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token");
+  const kind = url.searchParams.get("kind");
   if (!token || !ADDRESS_RE.test(token)) {
     return NextResponse.json({ error: "invalid or missing token address" }, { status: 400 });
   }
   const key = token.toLowerCase();
+  const startBlock = startBlockForKind(kind);
   const now = Date.now();
 
   const st = state.get(key);
@@ -200,7 +223,7 @@ export async function GET(req: Request) {
   // incremental refresh is one small getLogs, and the inflight map guarantees
   // at most one runs per token no matter how many viewers are polling.
   if (st) {
-    void refresh(key, token as Address).catch(() => {});
+    void refresh(key, token as Address, startBlock).catch(() => {});
     return NextResponse.json(st.payload, { headers: CACHE_HEADERS });
   }
 
@@ -215,7 +238,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const payload = await refresh(key, token as Address);
+    const payload = await refresh(key, token as Address, startBlock);
     return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch {
     // Scan failed (RPC hiccup) — an empty-but-unavailable list, always HTTP 200

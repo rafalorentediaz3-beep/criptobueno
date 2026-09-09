@@ -334,11 +334,11 @@ const EMPTY_HOLDERS: HoldersData = { holders: [], total: 0n, unavailable: false 
  * Balances per address, sorted descending. The Transfer-log scan runs
  * server-side (cached) at /api/holders.
  */
-export function useTokenHolders(token: Address | undefined) {
+export function useTokenHolders(token: Address | undefined, kind?: "curve" | "direct" | "v4") {
   const { chainId, isDeployed } = usePad();
   const queryKey = useMemo(
-    () => ["token-holders", chainId, token ?? "none"],
-    [chainId, token],
+    () => ["token-holders", chainId, token ?? "none", kind ?? "any"],
+    [chainId, token, kind],
   );
 
   const query = useQuery<HoldersData>({
@@ -349,7 +349,8 @@ export function useTokenHolders(token: Address | undefined) {
     queryFn: async () => {
       if (!token) return EMPTY_HOLDERS;
       try {
-        const res = await fetch(`/api/holders?token=${token}`);
+        const kindParam = kind ? `&kind=${kind}` : "";
+        const res = await fetch(`/api/holders?token=${token}${kindParam}`);
         if (!res.ok) return { ...EMPTY_HOLDERS, unavailable: true };
         const json = (await res.json()) as {
           holders: Array<{ address: Address; balance: string }>;

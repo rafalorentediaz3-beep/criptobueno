@@ -36,7 +36,7 @@ export function TokenTraders({
 }) {
   const client = usePublicClient();
   const [tab, setTab] = useState<"trades" | "holders">(isV4 ? "trades" : "holders");
-  const { holders, total, unavailable, isLoading } = useTokenHolders(token);
+  const { holders, total, unavailable, isLoading } = useTokenHolders(token, isV4 ? "v4" : undefined);
   const topHolders = holders.slice(0, 10);
   const { usd: ethUsd } = useEthUsdPrice();
   const tradesQuery = useV4SwapHistory(token, poolId, isV4 && tab === "trades" && !!client, 15_000);
