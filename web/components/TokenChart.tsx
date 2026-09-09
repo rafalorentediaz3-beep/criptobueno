@@ -1,11 +1,9 @@
 "use client";
 
 import { CandlestickChart, ExternalLink, Sprout } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { decodeEventLog, parseAbiItem } from "viem";
+import { useMemo, useState } from "react";
 import type { Address, Hex } from "viem";
 import { usePublicClient } from "wagmi";
-import { useQuery } from "@tanstack/react-query";
 import { usePad } from "@/lib/hooks";
 import {
   GECKOTERMINAL_NETWORKS,
@@ -13,15 +11,12 @@ import {
   geckoTerminalPoolUrl,
   uniswapSwapUrl,
 } from "@/lib/config";
-import { bpsToPercent } from "@/lib/format";
+import { bpsToPercent, formatUsd } from "@/lib/format";
 import { useGeckoIndexed } from "@/lib/useGeckoIndexed";
+import { useEthUsdPrice } from "@/lib/price";
+import { useV4SwapHistory } from "@/lib/useV4SwapHistory";
 import { ProgressBar } from "@/components/ProgressBar";
-import { priceWethPerToken, tokenIsToken0 } from "@/lib/pool";
-import { V4_POOL_MANAGER_ADDRESSES } from "@/lib/config";
-
-const v4SwapEvent = parseAbiItem(
-  "event Swap(bytes32 indexed id,address indexed sender,int128 amount0,int128 amount1,uint160 sqrtPriceX96,uint128 liquidity,int24 tick,uint24 fee)",
-);
+import { TOTAL_SUPPLY_WHOLE } from "@/lib/pool";
 
 /**
  * Price chart for a PotatoPad token. Every token — curve or direct — trades on a
@@ -29,6 +24,11 @@ const v4SwapEvent = parseAbiItem(
  * chart (falling back to a "trades on Uniswap" placeholder on networks GT doesn't
  * index yet). Curve tokens additionally get a bonding-curve progress bar UNDER the
  * chart: pre-bond it climbs toward 100%, and once bonded it reads full / locked.
+ *
+ * V4 tokens instead get a self-hosted live area chart (styled after Axiom /
+ * pump.fun-style launchpad charts): a big market-cap number up top, a
+ * timeframe switcher, a crosshair tooltip on hover, and pan/zoom controls so
+ * you can scroll back through history and stretch the price axis.
  */
 export function TokenChart({
   token,
@@ -54,7 +54,7 @@ export function TokenChart({
   /** Curve progress toward bond, 0–10000 bps (100% once bonded). */
   progressBps?: bigint;
 }) {
-  const { chainId, weth } = usePad();
+  const { chainId } = usePad();
   const client = usePublicClient();
   const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m" | "1H" | "1D" | "1W">("Total");
   // How often the chart re-polls the chain for new swaps — selectable like
@@ -74,100 +74,27 @@ export function TokenChart({
   const indexing = hasPool && geckoStatus === "missing";
   // A bonded curve is 100% by definition, regardless of the live pool tick.
   const barBps = bonded ? 10_000n : progressBps;
-  const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
-  // One-time backfill depth when a pool is first opened. After that, every
-  // poll only asks for blocks strictly newer than the last one we've already
-  // fetched (see cache below) — NOT this whole range again.
-  const FETCH_BLOCKS = 5_000_000n;
-  // Accumulates swap points across polls so each tick only has to fetch the
-  // handful of blocks produced since the last tick, instead of re-scanning
-  // millions of blocks every time. Keyed by pool so switching tokens resets it.
-  // This was the actual cause of pages hanging: re-running a 5,000,000-block
-  // getLogs every second, from every open tab, blew through the shared RPC
-  // rate limit and starved the rest of the site.
-  const chartCacheRef = useRef<{
-    key: string;
-    points: { timestamp: number; price: number }[];
-    lastBlock: bigint;
-    blockTsCache: Map<string, number>;
-  } | null>(null);
-  const v4HistoryQuery = useQuery({
-    queryKey: ["v4-chart", chainId, poolId, weth],
-    enabled: isV4 && !!poolId && !!client,
-    // Selectable cadence (default 15s) — each tick is a cheap incremental
-    // fetch (only blocks since the last poll), not a full history re-scan.
-    refetchInterval: REFRESH_OPTIONS[refreshLabel],
-    queryFn: async () => {
-      if (!client || !poolId) return { points: [], latestTs: 0 };
-      const cacheKey = `${chainId}:${poolId}:${weth}`;
-      let cache = chartCacheRef.current;
-      if (!cache || cache.key !== cacheKey) {
-        cache = { key: cacheKey, points: [], lastBlock: -1n, blockTsCache: new Map() };
-        chartCacheRef.current = cache;
-      }
-      const latest = await client.getBlockNumber();
-      const fromBlock =
-        cache.lastBlock < 0n ? (latest > FETCH_BLOCKS ? latest - FETCH_BLOCKS : 0n) : cache.lastBlock + 1n;
-      if (fromBlock <= latest) {
-        const logs = await client.getLogs({
-          address: v4Manager,
-          event: v4SwapEvent,
-          args: { id: poolId },
-          fromBlock,
-          toBlock: latest,
-        });
-        if (logs.length > 0) {
-          const uniqueBlocks = Array.from(new Set(logs.map((log) => log.blockNumber ?? 0n))).filter(
-            (b) => !cache!.blockTsCache.has(b.toString()),
-          );
-          const blockEntries = await Promise.all(
-            uniqueBlocks.map(async (blockNumber) => {
-              const block = await client.getBlock({ blockNumber });
-              return [blockNumber, Number(block.timestamp)] as const;
-            }),
-          );
-          for (const [blockNumber, ts] of blockEntries) cache.blockTsCache.set(blockNumber.toString(), ts);
-          const newPoints = logs
-            .map((log) => {
-              const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });
-              return {
-                timestamp: cache!.blockTsCache.get((log.blockNumber ?? 0n).toString()) ?? 0,
-                price: priceWethPerToken(decoded.args.sqrtPriceX96, tokenIsToken0(token, weth)),
-              };
-            })
-            // A missing/failed block timestamp lookup would default to 0 and
-            // corrupt the whole time axis (huge fake time span → the chart
-            // tries to allocate millions of candle buckets and the tab hangs),
-            // so drop anything without a real timestamp.
-            .filter((point) => point.price > 0 && point.timestamp > 0);
-          cache.points = [...cache.points, ...newPoints].sort((a, b) => a.timestamp - b.timestamp);
-        }
-        cache.lastBlock = latest;
-      }
-      const latestBlock = await client.getBlock({ blockNumber: latest });
-      return { points: cache.points, latestTs: Number(latestBlock.timestamp) };
-    },
-  });
-  const v4Points = v4HistoryQuery.data?.points ?? [];
-  const latestTs = v4HistoryQuery.data?.latestTs ?? 0;
 
-  // Bucket raw swap prices into fixed-width candles (Axiom/TradingView style):
-  // open/close/high/low per bucket, green when it closed up, red when down.
-  // Empty buckets (no trade that slice) carry the previous close forward flat,
-  // so the chart reads as one continuous series instead of gaps.
-  // "Total" spreads every trade evenly across the whole history; "5m"/"15m"
-  // use real wall-clock candle widths over a trailing window, like a normal
-  // trading terminal timeframe switch.
+  const v4HistoryQuery = useV4SwapHistory(token, poolId, isV4 && !!client, REFRESH_OPTIONS[refreshLabel]);
+  const v4Points = v4HistoryQuery.data?.points ?? [];
+  const { usd: ethUsd } = useEthUsdPrice();
+
+  // Bucket raw swap prices into fixed-width candles: open/close/high/low per
+  // bucket. Empty buckets (no trade that slice) carry the previous close
+  // forward flat, so the chart reads as one continuous series instead of
+  // gaps. "Total" spreads every trade evenly across the whole history;
+  // "5m"/"15m"/"1H"/"1D"/"1W" use real wall-clock candle widths, like a
+  // normal trading terminal timeframe switch.
   const CANDLE_COUNT = 36;
   const VISIBLE_CANDLES = 48;
   type Candle = { open: number; high: number; low: number; close: number };
 
   // Full-resolution candle series: for "Total" this is the whole history
   // squashed into CANDLE_COUNT buckets (no panning needed, you already see
-  // everything). For "5m"/"15m" this is the *entire* trade history bucketed
-  // at that real candle width — panning below just slides a viewing window
-  // over it, Axiom-style, so scrolling left reveals older candles instead of
-  // re-fetching anything.
+  // everything). For the real-width timeframes this is the *entire* trade
+  // history bucketed at that width — panning below just slides a viewing
+  // window over it, Axiom-style, so scrolling left reveals older candles
+  // instead of re-fetching anything.
   const { fullCandles, fullTimestamps } = useMemo(() => {
     if (v4Points.length === 0) return { fullCandles: [] as Candle[], fullTimestamps: [] as number[] };
     type Bucket = { open?: number; high: number; low: number; close?: number };
@@ -218,8 +145,6 @@ export function TokenChart({
   }, [v4Points, interval]);
 
   // Pan offset in candles, counted back from the live edge (0 = latest).
-  // Reset whenever the interval changes so switching timeframes always
-  // starts at the live edge.
   const [panOffset, setPanOffset] = useState(0);
   const canPanForTimeframe = interval !== "Total";
   const maxPanOffset = canPanForTimeframe ? Math.max(0, fullCandles.length - VISIBLE_CANDLES) : 0;
@@ -238,8 +163,8 @@ export function TokenChart({
   const rawCandleMax = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 0;
 
   // Vertical (price / market-cap) zoom: 1 = fit the visible range exactly;
-  // >1 narrows the range around its midpoint so candles read taller/bigger;
-  // <1 widens it so candles read shorter/smaller — same idea as Axiom's
+  // >1 narrows the range around its midpoint so the line reads taller/bigger;
+  // <1 widens it so it reads shorter/smaller — same idea as Axiom's
   // scroll-to-zoom on the price axis, exposed here as +/- buttons.
   const [zoomY, setZoomY] = useState(1);
   const zoomIn = () => setZoomY((z) => Math.min(8, z * 1.4));
@@ -253,9 +178,15 @@ export function TokenChart({
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const hoverCandle = hoverIndex !== null ? candles[hoverIndex] : undefined;
+  const hoverTs = hoverIndex !== null ? candleTimestamps[hoverIndex] : undefined;
+
+  const marketCap = (p: number) => p * TOTAL_SUPPLY_WHOLE;
+  const formatBigUsd = (ethAmount: number) => (ethUsd ? formatUsd(ethAmount * ethUsd) : `${ethAmount.toFixed(8)} WETH`);
   const formatPrice = (value: number) => `${value.toFixed(12)} WETH`;
-  // Short axis label for a compact price tick, e.g. "0.0000000030".
-  const formatAxisPrice = (value: number) => value.toFixed(10);
+  const formatDateTime = (ts: number) =>
+    ts && ts > 0
+      ? new Date(ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "";
   const formatTime = (ts: number) => {
     if (ts <= 0) return "";
     const date = new Date(ts * 1000);
@@ -271,6 +202,26 @@ export function TokenChart({
     const steps = 4;
     return Array.from({ length: steps + 1 }, (_, i) => candleMax - (i / steps) * (candleMax - candleMin));
   }, [candleMin, candleMax, candles.length]);
+
+  // Trend color for the whole line/area, like most launchpad charts: green if
+  // the visible window is up overall, red if down — not per-segment.
+  const trendUp = candles.length > 1 ? candles[candles.length - 1].close >= candles[0].open : true;
+  const lineColor = trendUp ? "#22c55e" : "#f43f5e";
+
+  const scaleY = (value: number) =>
+    candleMax === candleMin ? 50 : 96 - ((value - candleMin) / (candleMax - candleMin)) * 88;
+  const linePoints = candles.map((candle, index) => {
+    const slot = 100 / candles.length;
+    return { x: slot * (index + 0.5), y: scaleY(candle.close) };
+  });
+  const linePath = linePoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const areaPath =
+    linePoints.length > 0
+      ? `${linePath} L ${linePoints[linePoints.length - 1].x} 100 L ${linePoints[0].x} 100 Z`
+      : "";
+
+  const displayPrice = hoverCandle ? hoverCandle.close : priceWeth;
+  const displayTs = hoverCandle ? hoverTs : v4HistoryQuery.data?.latestTs;
 
   return (
     <section className="card p-4 pt-5 sm:p-6 sm:pt-6">
@@ -303,40 +254,21 @@ export function TokenChart({
           />
         </div>
       ) : isV4 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-sm text-amber-400">
-                {hoverCandle ? formatPrice(hoverCandle.close) : priceWeth > 0 ? formatPrice(priceWeth) : "Loading price…"}
-              </span>
-              {/* Legend so the colors are self-explanatory without hovering. */}
-              <span className="hidden items-center gap-3 text-[10px] text-neutral-500 sm:flex">
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Price up
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-rose-500" /> Price down
-                </span>
-              </span>
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+          {/* Big headline number, pump.fun/Axiom style: market cap (USD when we
+              have a spot price, WETH otherwise) with a timestamp underneath. */}
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-mono text-2xl font-semibold text-neutral-50">
+                {displayPrice > 0 ? formatBigUsd(marketCap(displayPrice)) : "Loading…"}
+              </div>
+              <div className="mt-0.5 text-[11px] text-neutral-500">
+                {displayTs ? formatDateTime(displayTs) : "\u00A0"}
+              </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-1">
-              {/* Refresh cadence — how often the chart re-polls the chain,
-                  independent from the candle timeframe below. */}
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] uppercase text-neutral-600">Refresh</span>
-                {(Object.keys(REFRESH_OPTIONS) as Array<keyof typeof REFRESH_OPTIONS>).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setRefreshLabel(item)}
-                    className={`rounded px-1.5 py-1 text-[10px] ${refreshLabel === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
               {/* Timeframe switch — same idea as Axiom's row of candle widths. */}
-              <div className="flex gap-1 border-l border-neutral-800 pl-1">
+              <div className="flex gap-0.5 rounded-full bg-neutral-900 p-0.5">
                 {(["Total", "5m", "15m", "1H", "1D", "1W"] as const).map((item) => (
                   <button
                     key={item}
@@ -345,95 +277,45 @@ export function TokenChart({
                       setIntervalOption(item);
                       setPanOffset(0);
                     }}
-                    className={`rounded px-2 py-1 text-[10px] ${interval === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${interval === item ? "bg-amber-500 text-black" : "text-neutral-400 hover:text-neutral-200"}`}
                   >
                     {item}
                   </button>
                 ))}
               </div>
-              {/* Pan controls: scroll back through history / jump back to live,
-                  like dragging Axiom's chart left and right. */}
-              <div className="flex items-center gap-1 border-l border-neutral-800 pl-1">
-                <button
-                  type="button"
-                  onClick={panBack}
-                  disabled={!canPanForTimeframe || atOldestEdge}
-                  title="Older candles"
-                  className="rounded bg-neutral-800 px-1.5 py-1 text-[10px] text-neutral-400 disabled:opacity-30"
-                >
-                  ◀
-                </button>
-                <button
-                  type="button"
-                  onClick={goLive}
-                  disabled={!canPanForTimeframe || atLiveEdge}
-                  title="Jump to live"
-                  className="rounded bg-neutral-800 px-1.5 py-1 text-[9px] uppercase text-neutral-400 disabled:opacity-30"
-                >
-                  Live
-                </button>
-                <button
-                  type="button"
-                  onClick={panForward}
-                  disabled={!canPanForTimeframe || atLiveEdge}
-                  title="Newer candles"
-                  className="rounded bg-neutral-800 px-1.5 py-1 text-[10px] text-neutral-400 disabled:opacity-30"
-                >
-                  ▶
-                </button>
-              </div>
-              {/* Vertical zoom: squeeze/stretch the price (market cap) axis so
-                  candles read bigger or smaller, same as scrolling on Axiom's
-                  price axis. */}
-              <div className="flex items-center gap-1 border-l border-neutral-800 pl-1">
-                <button
-                  type="button"
-                  onClick={zoomOut}
-                  title="Zoom out price axis"
-                  className="rounded bg-neutral-800 px-1.5 py-1 text-[11px] text-neutral-400"
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  onClick={zoomReset}
-                  title="Reset zoom"
-                  className="rounded bg-neutral-800 px-1.5 py-1 text-[9px] uppercase text-neutral-400"
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  onClick={zoomIn}
-                  title="Zoom in price axis"
-                  className="rounded bg-neutral-800 px-1.5 py-1 text-[11px] text-neutral-400"
-                >
-                  +
-                </button>
-              </div>
             </div>
           </div>
+
           {candles.length > 0 ? (
             <div className="flex gap-2">
-              {/* Y axis: price scale (WETH per token), high at top / low at bottom. */}
-              <div className="flex w-24 flex-col justify-between py-1 text-right font-mono text-[9px] leading-none text-neutral-500">
+              {/* Y axis: price scale (market cap), high at top / low at bottom. */}
+              <div className="flex w-20 flex-col justify-between py-1 text-right font-mono text-[9px] leading-none text-neutral-500">
                 {priceTicks.map((tick, i) => (
-                  <span key={i}>{formatAxisPrice(tick)}</span>
+                  <span key={i}>{formatBigUsd(marketCap(tick))}</span>
                 ))}
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="relative min-w-0 flex-1">
                 <svg
                   viewBox="0 0 100 100"
                   preserveAspectRatio="none"
-                  className="h-64 w-full"
+                  className="h-64 w-full cursor-crosshair"
                   role="img"
-                  aria-label="V4 candlestick chart: price in WETH over time, green candles closed higher, red closed lower"
+                  aria-label="V4 area chart: market cap over time, green when the visible window is up, red when down"
+                  onMouseMove={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                    setHoverIndex(Math.min(candles.length - 1, Math.floor(pct * candles.length)));
+                  }}
                   onMouseLeave={() => setHoverIndex(null)}
                 >
                   <defs>
                     <linearGradient id="chart-grid-fade" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#3f3f46" stopOpacity="0.5" />
                       <stop offset="100%" stopColor="#3f3f46" stopOpacity="0.15" />
+                    </linearGradient>
+                    <linearGradient id="chart-area-fill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={lineColor} stopOpacity="0.35" />
+                      <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
                     </linearGradient>
                   </defs>
                   {/* Horizontal gridlines aligned with the price ticks on the left. */}
@@ -446,53 +328,47 @@ export function TokenChart({
                       y2={(i / (priceTicks.length - 1)) * 92 + 4}
                       stroke="url(#chart-grid-fade)"
                       strokeWidth="0.3"
+                      strokeDasharray="1.5,1.5"
                     />
                   ))}
-                  {candles.map((candle, index) => {
-                    const slot = 100 / candles.length;
-                    const cx = slot * (index + 0.5);
-                    const bodyWidth = slot * 0.55;
-                    const scale = (value: number) =>
-                      candleMax === candleMin ? 50 : 96 - ((value - candleMin) / (candleMax - candleMin)) * 88;
-                    const up = candle.close >= candle.open;
-                    const color = up ? "#10b981" : "#f43f5e";
-                    const yOpen = scale(candle.open);
-                    const yClose = scale(candle.close);
-                    const bodyTop = Math.min(yOpen, yClose);
-                    const bodyHeight = Math.max(Math.abs(yOpen - yClose), 0.8);
-                    const isHovered = hoverIndex === index;
-                    return (
-                      <g
-                        key={index}
-                        onMouseEnter={() => setHoverIndex(index)}
-                        onClick={() => setHoverIndex(index)}
-                        className="cursor-pointer"
-                        style={{ opacity: hoverIndex === null || isHovered ? 1 : 0.55 }}
-                      >
-                        {/* Wide invisible hit target so hovering/tapping anywhere in the
-                            candle's slot selects it, not just the thin wick/body. */}
-                        <rect x={cx - slot / 2} y={0} width={slot} height={100} fill="transparent" />
-                        <line
-                          x1={cx}
-                          x2={cx}
-                          y1={scale(candle.high)}
-                          y2={scale(candle.low)}
-                          stroke={color}
-                          strokeWidth="0.5"
-                          strokeLinecap="round"
-                        />
-                        <rect
-                          x={cx - bodyWidth / 2}
-                          y={bodyTop}
-                          width={bodyWidth}
-                          height={bodyHeight}
-                          rx={bodyWidth * 0.25}
-                          fill={color}
-                        />
-                      </g>
-                    );
-                  })}
+                  {areaPath && <path d={areaPath} fill="url(#chart-area-fill)" stroke="none" />}
+                  {linePath && (
+                    <path d={linePath} fill="none" stroke={lineColor} strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" />
+                  )}
+                  {hoverIndex !== null && linePoints[hoverIndex] && (
+                    <>
+                      <line
+                        x1={linePoints[hoverIndex].x}
+                        x2={linePoints[hoverIndex].x}
+                        y1={4}
+                        y2={96}
+                        stroke="#71717a"
+                        strokeWidth="0.3"
+                        strokeDasharray="1.5,1.5"
+                      />
+                      <circle cx={linePoints[hoverIndex].x} cy={linePoints[hoverIndex].y} r="1.2" fill={lineColor} />
+                    </>
+                  )}
+                  {/* Live pulse dot at the latest point when looking at the live edge. */}
+                  {atLiveEdge && linePoints.length > 0 && (
+                    <circle
+                      cx={linePoints[linePoints.length - 1].x}
+                      cy={linePoints[linePoints.length - 1].y}
+                      r="1"
+                      fill={lineColor}
+                    />
+                  )}
                 </svg>
+                {/* Floating crosshair tooltip, positioned above the hovered point. */}
+                {hoverIndex !== null && hoverCandle && linePoints[hoverIndex] && (
+                  <div
+                    className="pointer-events-none absolute top-1 -translate-x-1/2 rounded-md bg-neutral-800 px-2 py-1 text-[10px] shadow-lg"
+                    style={{ left: `${linePoints[hoverIndex].x}%` }}
+                  >
+                    <div className="font-semibold text-neutral-100">{formatBigUsd(marketCap(hoverCandle.close))}</div>
+                    <div className="text-neutral-400">{formatDateTime(candleTimestamps[hoverIndex])}</div>
+                  </div>
+                )}
                 {/* X axis: real clock time under a spread of candles. */}
                 <div className="mt-1 flex justify-between font-mono text-[9px] text-neutral-500">
                   {candleTimestamps
@@ -508,6 +384,71 @@ export function TokenChart({
               Waiting for the first trade…
             </div>
           )}
+
+          {/* Secondary controls row: refresh cadence, history pan, price zoom —
+              kept compact/subtle below the chart so the headline number and
+              timeframe pills stay the visual focus, like a real terminal. */}
+          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-neutral-800 pt-2 text-[10px] text-neutral-500">
+            <div className="flex items-center gap-1">
+              <span className="uppercase text-neutral-600">Refresh</span>
+              {(Object.keys(REFRESH_OPTIONS) as Array<keyof typeof REFRESH_OPTIONS>).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setRefreshLabel(item)}
+                  className={`rounded px-1.5 py-0.5 ${refreshLabel === item ? "bg-amber-500 text-black" : "bg-neutral-800 text-neutral-400"}`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 border-l border-neutral-800 pl-3">
+              <button
+                type="button"
+                onClick={panBack}
+                disabled={!canPanForTimeframe || atOldestEdge}
+                title="Older history"
+                className="rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-400 disabled:opacity-30"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                onClick={goLive}
+                disabled={!canPanForTimeframe || atLiveEdge}
+                title="Jump to live"
+                className="rounded bg-neutral-800 px-1.5 py-0.5 uppercase text-neutral-400 disabled:opacity-30"
+              >
+                Live
+              </button>
+              <button
+                type="button"
+                onClick={panForward}
+                disabled={!canPanForTimeframe || atLiveEdge}
+                title="Newer history"
+                className="rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-400 disabled:opacity-30"
+              >
+                ▶
+              </button>
+            </div>
+            <div className="flex items-center gap-1 border-l border-neutral-800 pl-3">
+              <span className="uppercase text-neutral-600">Zoom</span>
+              <button type="button" onClick={zoomOut} title="Zoom out" className="rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-400">
+                −
+              </button>
+              <button type="button" onClick={zoomReset} title="Reset zoom" className="rounded bg-neutral-800 px-1.5 py-0.5 uppercase text-neutral-400">
+                Reset
+              </button>
+              <button type="button" onClick={zoomIn} title="Zoom in" className="rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-400">
+                +
+              </button>
+            </div>
+            <span className="ml-auto flex items-center gap-1">
+              <span className={`h-1.5 w-1.5 rounded-full ${trendUp ? "bg-emerald-500" : "bg-rose-500"}`} />
+              {trendUp ? "Up" : "Down"} this window
+            </span>
+          </div>
+
           {hoverCandle && (
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-neutral-400">
               <span>O {formatPrice(hoverCandle.open)}</span>

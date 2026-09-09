@@ -16,6 +16,7 @@ import { BondCard } from "@/components/BondCard";
 import { HolderRewardsCard } from "@/components/HolderRewardsCard";
 import { NotDeployed } from "@/components/NotDeployed";
 import { TokenChart } from "@/components/TokenChart";
+import { TokenTraders } from "@/components/TokenTraders";
 import { LineSkeleton } from "@/components/Skeletons";
 import { StatsCard } from "@/components/StatsCard";
 import { TokenHeaderCard } from "@/components/TokenHeaderCard";
@@ -243,6 +244,14 @@ export default function TokenPageClient() {
           isCurve={isCurve}
           bonded={resolved.bonded}
           progressBps={curve.progressBps}
+        />
+        <TokenTraders
+          token={token}
+          poolId={resolved.poolId}
+          creator={creator}
+          pool={pool}
+          symbol={symbol ?? ""}
+          isV4={isV4}
         />
       </div>
 
