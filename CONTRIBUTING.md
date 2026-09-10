@@ -43,7 +43,7 @@ See the [README](./README.md) for running the full stack locally against a seede
 - **Tested.** New contract behavior needs Hardhat tests. Security-relevant changes especially.
 - **No secrets.** Never commit private keys, RPC URLs with keys, or `.env*` files (they're gitignored — keep it that way).
 - **Honest.** No owner backdoors, upgradeable-proxy rug vectors, or hidden fees. The whole point is that the code is what it says it is.
-- **Keeps attribution.** Per the [LICENSE](./LICENSE), any user-facing deployment keeps the "Made by proofofpotato.com" footer credit.
+- **Keeps attribution.** Per the [LICENSE](./LICENSE), any user-facing deployment keeps the "Made by Mrmoneypoly.com" footer credit.
 
 ## Reporting bugs & ideas
 

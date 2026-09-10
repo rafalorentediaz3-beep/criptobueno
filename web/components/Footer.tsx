@@ -36,7 +36,7 @@ export function Footer() {
             rel="noreferrer"
             className="font-medium text-amber-500/80 transition-colors hover:text-amber-400"
           >
-            Made by proofofpotato.com
+            Made by Mrmoneypoly.com
           </a>
         </div>
       </div>
