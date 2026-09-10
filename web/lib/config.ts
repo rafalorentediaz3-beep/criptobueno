@@ -490,7 +490,7 @@ export function geckoTerminalPoolUrl(chainId: number, pool: string): string | un
     : undefined;
 }
 
-export const PROOF_OF_POTATO_URL = "https://proofofpotato.com";
+export const PROOF_OF_POTATO_URL = "https://x.com/onchainscam";
 
 /** Canonical public origin. Also the website a coin gets when its creator leaves
  *  the field blank, so explorers reading the launch metadata link somewhere real
