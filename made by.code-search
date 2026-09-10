@@ -1,0 +1,34 @@
+# Query: made by
+# ContextLines: 1
+
+6 results - 6 files
+
+CONTRIBUTING.md:
+  45  - **Honest.** No owner backdoors, upgradeable-proxy rug vectors, or hidden fees. The whole point is that the code is what it says it is.
+  46: - **Keeps attribution.** Per the [LICENSE](./LICENSE), any user-facing deployment keeps the "Made by Mrmoneypoly" footer credit.
+  47  
+
+Footer.tsx:
+  55            >
+  56:             Made by Mrmoneypoly
+  57            </a>
+
+LICENSE:
+  16     Software that includes a user-facing interface must display a clearly
+  17:    visible credit reading "Made by Mrmoneypoly" (or an equivalent
+  18     attribution linking to https://criptobueno-production.up.railway.app/) in the footer of every
+
+.github/pull_request_template.md:
+  20  - [ ] No secrets, private keys, or `.env*` files committed
+  21: - [ ] No hidden owner powers / rug vectors introduced; keeps the "Made by Mrmoneypoly" credit
+  22  - [ ] Description explains the *why*, not just the *what*
+
+web/app/terms/page.tsx:
+  70            <p className="text-sm leading-relaxed text-neutral-300">
+  71:             Potato Pad is an open-source project made by{" "}
+  72              <a
+
+web/components/Footer.tsx:
+  55            >
+  56:             Made by Mrmoneypoly
+  57            </a>
