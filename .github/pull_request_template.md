@@ -18,7 +18,7 @@
 - [ ] `web/`: `npx tsc --noEmit` is clean and `npm run build` succeeds
 - [ ] Focused on one concern; no unrelated changes
 - [ ] No secrets, private keys, or `.env*` files committed
-- [ ] No hidden owner powers / rug vectors introduced; keeps the "Made by Mrmoneypoly.com" credit
+- [ ] No hidden owner powers / rug vectors introduced; keeps the ".com" credit
 - [ ] Description explains the *why*, not just the *what*
 
 ## Anything reviewers should look at closely?

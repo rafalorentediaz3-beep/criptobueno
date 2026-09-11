@@ -53,7 +53,8 @@ export function Footer() {
             rel="noreferrer"
             className="font-medium text-amber-500/90 transition-colors hover:text-amber-400"
           >
-            Made by Mrmoneypoly.com
+            
+          
           </a>
         </div>
       </div>
