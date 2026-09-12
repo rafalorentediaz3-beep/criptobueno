@@ -4,7 +4,6 @@ import Link from "next/link";
 import { memo } from "react";
 import { type Address } from "viem";
 import { formatUsd, timeAgo } from "@/lib/format";
-import { useEthUsdPrice } from "@/lib/price";
 import { TokenAvatar } from "@/components/TokenAvatar";
 
 export interface TokenRow {
@@ -58,14 +57,13 @@ function TokenCardImpl({
   row: TokenRow;
   hideCreatorLink?: boolean;
 }) {
-  const { usd: ethUsd } = useEthUsdPrice();
-
-  const mcapUsd = row.ancient
-    ? (row.marketCapUsd ?? 0)
-    : ethUsd !== null && row.marketCapEth != null && row.marketCapEth > 0
-      ? row.marketCapEth * ethUsd
-      : 0;
-  const mc = mcapUsd > 0 ? formatUsd(mcapUsd) : "—";
+  const mcapUsd = row.marketCapUsd ?? 0;
+  const mc =
+    mcapUsd > 0
+      ? formatUsd(mcapUsd)
+      : row.marketCapEth != null && row.marketCapEth > 0
+        ? `${row.marketCapEth.toLocaleString("en-US", { maximumFractionDigits: 2 })} ETH`
+        : "—";
 
   // ── Ancient card: image, name, MC + 24h VOL, Ancient tag ──
   if (row.ancient) {

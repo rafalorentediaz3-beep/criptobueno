@@ -1,5 +1,13 @@
-import { createPublicClient, parseAbiItem, type Address } from "viem";
-import { allPadDeployments, robinhoodChain, ZERO_ADDRESS, type PadKind } from "@/lib/config";
+import { createPublicClient, encodePacked, keccak256, parseAbiItem, type Address, type Hex } from "viem";
+import { potatoV4PadAbi } from "@/lib/abi";
+import {
+  allPadDeployments,
+  robinhoodChain,
+  V4_POOL_MANAGER_ADDRESSES,
+  WETH_ADDRESSES,
+  ZERO_ADDRESS,
+  type PadKind,
+} from "@/lib/config";
 import { robinhoodServerTransport } from "@/lib/serverRpc";
 
 /**
@@ -58,6 +66,10 @@ export interface CreationDTO {
   pad: Address;
   /** 24h USD volume from GeckoTerminal (0 if unindexed) — drives "Recent buys". */
   volume24Usd: number;
+  /** Best-effort USD FDV from the same market-data response. */
+  marketCapUsd: number;
+  /** On-chain FDV in ETH, precomputed for instant card rendering. */
+  marketCapEth: number;
   /** Which pad kind launched it: curve, legacy direct, or direct-to-v4. */
   kind: PadKind;
 }
@@ -166,8 +178,79 @@ async function scanPadRange(
 }
 
 /** Best-effort per-token 24h USD volume from GeckoTerminal (0 if unindexed). */
-async function fetchVolumes(addresses: Address[]): Promise<Map<string, number>> {
+interface MarketSnapshot {
+  volume24Usd: number;
+  marketCapUsd: number;
+}
+
+const v4ExtsloadAbi = [
+  {
+    inputs: [{ name: "slot", type: "bytes32" }],
+    name: "extsload",
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+const Q96 = 2 ** 96;
+const TOTAL_SUPPLY_WHOLE = 1_000_000_000;
+
+function v4StateSlot(poolId: Hex): Hex {
+  return keccak256(encodePacked(["bytes32", "uint256"], [poolId, 6n]));
+}
+
+async function fetchV4MarketCaps(
+  tokens: { token: Address; pad: Address }[],
+): Promise<Map<string, number>> {
   const out = new Map<string, number>();
+  const manager = V4_POOL_MANAGER_ADDRESSES[robinhoodChain.id];
+  const weth = WETH_ADDRESSES[robinhoodChain.id];
+  if (!manager || !weth || tokens.length === 0) return out;
+
+  const tokenReads = await client.multicall({
+    allowFailure: true,
+    contracts: tokens.map(({ token, pad }) => ({
+      address: pad,
+      abi: potatoV4PadAbi,
+      functionName: "v4Tokens" as const,
+      args: [token],
+    })),
+  });
+  const resolved = tokens.flatMap((entry, index) => {
+    const value = tokenReads[index]?.result as readonly [Address, Hex, bigint, number] | undefined;
+    return value?.[0] && value[0] !== ZERO_ADDRESS ? [{ ...entry, poolId: value[1] }] : [];
+  });
+  if (resolved.length === 0) return out;
+
+  const stateReads = await client.multicall({
+    allowFailure: true,
+    contracts: resolved.map(({ poolId }) => ({
+      address: manager,
+      abi: v4ExtsloadAbi,
+      functionName: "extsload" as const,
+      args: [v4StateSlot(poolId)],
+    })),
+  });
+  resolved.forEach(({ token }, index) => {
+    const word = stateReads[index]?.result as Hex | undefined;
+    const sqrtPriceX96 = word ? BigInt(word) & ((1n << 160n) - 1n) : 0n;
+    if (sqrtPriceX96 <= 0n) return;
+    const ratio = Number(sqrtPriceX96) / Q96;
+    const rawPrice = ratio * ratio;
+    const priceWeth = BigInt(token) < BigInt(weth) ? rawPrice : 1 / rawPrice;
+    const marketCapEth = priceWeth * TOTAL_SUPPLY_WHOLE;
+    if (Number.isFinite(marketCapEth) && marketCapEth > 0) {
+      out.set(token.toLowerCase(), marketCapEth);
+    }
+  });
+  return out;
+}
+
+async function fetchMarketSnapshots(
+  addresses: Address[],
+): Promise<Map<string, MarketSnapshot>> {
+  const out = new Map<string, MarketSnapshot>();
   if (addresses.length === 0) return out;
   const key = process.env.COINGECKO_API_KEY;
   const base = key
@@ -187,11 +270,24 @@ async function fetchVolumes(addresses: Address[]): Promise<Map<string, number>> 
       });
       if (!res.ok) continue;
       const j = (await res.json()) as {
-        data?: { attributes?: { address?: string; volume_usd?: { h24?: string } } }[];
+        data?: {
+          attributes?: {
+            address?: string;
+            volume_usd?: { h24?: string };
+            fdv_usd?: string;
+            market_cap_usd?: string;
+          };
+        }[];
       };
       for (const t of j.data ?? []) {
         const addr = (t.attributes?.address ?? "").toLowerCase();
-        if (addr) out.set(addr, Number(t.attributes?.volume_usd?.h24) || 0);
+        if (addr) {
+          out.set(addr, {
+            volume24Usd: Number(t.attributes?.volume_usd?.h24) || 0,
+            marketCapUsd:
+              Number(t.attributes?.fdv_usd) || Number(t.attributes?.market_cap_usd) || 0,
+          });
+        }
       }
     } catch {
       // best-effort — a volume miss just means that token sorts as cold
@@ -282,12 +378,21 @@ async function scan(): Promise<FeedPayload> {
   })();
 
   // Volume is optional enrichment; run it while block timestamps are loading.
-  const volumeTask = fetchVolumes(
+  const marketTask = fetchMarketSnapshots(
     tagged
       .map((t) => t.log.args.token)
       .filter((token): token is Address => Boolean(token)),
   );
-  await Promise.all([timestampTask, volumeTask]);
+  const v4MarketCapTask = fetchV4MarketCaps(
+    tagged.flatMap(({ log, pad }) =>
+      log.args.token &&
+      (pads.find((candidate) => candidate.address.toLowerCase() === pad.toLowerCase())?.kind ??
+        "direct") === "v4"
+        ? [{ token: log.args.token, pad }]
+        : [],
+    ),
+  ).catch(() => new Map<string, number>());
+  await Promise.all([timestampTask, marketTask, v4MarketCapTask]);
 
   // A token belongs to exactly one pad; dedupe by token address.
   const kindByPad = new Map(pads.map((p) => [p.address.toLowerCase(), p.kind ?? "direct"] as const));
@@ -312,13 +417,21 @@ async function scan(): Promise<FeedPayload> {
       blockNumber: bn !== null ? bn.toString() : "0",
       pad,
       volume24Usd: 0,
+      marketCapUsd: 0,
+      marketCapEth: 0,
       kind: kindByPad.get(pad.toLowerCase()) ?? "direct",
     });
   }
   // Enrich with 24h volume (best-effort) so the client can offer a "Recent buys" sort.
   const creations = [...byToken.values()];
-  const vols = await volumeTask;
-  for (const c of creations) c.volume24Usd = vols.get(c.token.toLowerCase()) ?? 0;
+  const markets = await marketTask;
+  const v4MarketCaps = await v4MarketCapTask;
+  for (const c of creations) {
+    const market = markets.get(c.token.toLowerCase());
+    c.volume24Usd = market?.volume24Usd ?? 0;
+    c.marketCapUsd = market?.marketCapUsd ?? 0;
+    c.marketCapEth = v4MarketCaps.get(c.token.toLowerCase()) ?? 0;
+  }
   // A partial scan (some window failed) surfaces as "unavailable" so the client
   // shows a warm cache rather than treating a truncated list as complete.
   return stamp(creations, unavailable ? "unavailable" : "fresh", Date.now());
@@ -326,20 +439,7 @@ async function scan(): Promise<FeedPayload> {
 
 let inFlight: Promise<FeedPayload> | null = null;
 
-/**
- * Cached feed getter. Always stamps a fresh `servedAt` (incl. cache hits).
- * Soft-degrades to stale/unavailable without throwing. Concurrent cold-cache
- * callers share ONE scan (in-flight coalescing).
- */
-export async function loadFeed(): Promise<FeedPayload> {
-  const now = Date.now();
-  if (cache && cache.expiresAt > now) {
-    return stamp(cache.creations, cache.state, cache.scanCompletedAt);
-  }
-  // Cold failure backoff: avoid hammering RPC with full multi-pad scans.
-  if (!cache && now < unavailableUntil) {
-    return stamp([], "unavailable", 0);
-  }
+function refreshFeed(): Promise<FeedPayload> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     try {
@@ -368,6 +468,29 @@ export async function loadFeed(): Promise<FeedPayload> {
     }
   })();
   return inFlight;
+}
+
+/**
+ * Cached feed getter. Always stamps a fresh `servedAt` (incl. cache hits).
+ * Soft-degrades to stale/unavailable without throwing. Concurrent cold-cache
+ * callers share ONE scan (in-flight coalescing).
+ */
+export async function loadFeed(): Promise<FeedPayload> {
+  const now = Date.now();
+  if (cache && cache.expiresAt > now) {
+    return stamp(cache.creations, cache.state, cache.scanCompletedAt);
+  }
+  // Once warmed, never make a visitor wait for the full chain scan. Serve the
+  // last trustworthy snapshot immediately and refresh it in the background.
+  if (cache) {
+    void refreshFeed();
+    return stamp(cache.creations, "stale", cache.scanCompletedAt);
+  }
+  // Cold failure backoff: avoid hammering RPC with full multi-pad scans.
+  if (now < unavailableUntil) {
+    return stamp([], "unavailable", 0);
+  }
+  return refreshFeed();
 }
 
 /** One token's creation record (name/symbol/image/pool), by address, from the cached feed. */

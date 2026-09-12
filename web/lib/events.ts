@@ -56,6 +56,10 @@ export interface CreationEvent {
   pad: Address;
   /** 24h USD volume (from the server feed); 0 if unindexed. */
   volume24Usd: number;
+  /** Cached USD FDV used for first paint while chain reads refresh. */
+  marketCapUsd: number;
+  /** Cached on-chain FDV in ETH used before browser RPC reads finish. */
+  marketCapEth: number;
   /** "curve" (bonding curve) or "direct" (legacy direct-to-Uniswap). */
   kind: PadKind;
 }
@@ -214,6 +218,8 @@ export function useLaunchActivity() {
           blockNumber: BigInt(c.blockNumber),
           pad: c.pad,
           volume24Usd: c.volume24Usd ?? 0,
+          marketCapUsd: c.marketCapUsd ?? 0,
+          marketCapEth: c.marketCapEth ?? 0,
           kind: c.kind ?? "direct", // backward-compat for any kind-less payload
         }));
         const state: FeedState =

@@ -76,7 +76,7 @@ export const uniswapV4PoolManagerAbi = [
   {
     inputs: [{ internalType: "bytes32", name: "slot", type: "bytes32" }],
     name: "extsload",
-    outputs: [{ internalType: "uint128", name: "liquidity", type: "uint128" }],
+    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
     stateMutability: "view",
     type: "function",
   },

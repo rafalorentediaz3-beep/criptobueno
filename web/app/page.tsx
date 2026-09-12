@@ -2,7 +2,7 @@
 
 import { Heart, Hourglass, Search, Sprout } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Address, Hex } from "viem";
 import { useReadContracts } from "wagmi";
 import { potatoCurvePadAbi, potatoV4PadAbi } from "@/lib/abi";
@@ -23,6 +23,7 @@ import {
 import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 import { useProfiles } from "@/lib/profile/useProfile";
 import { useFlipGrid } from "@/lib/useFlip";
+import { useEthUsdPrice } from "@/lib/price";
 import { NotDeployed } from "@/components/NotDeployed";
 import { useSearch } from "@/components/SearchContext";
 import { TokenCard, type TokenRow } from "@/components/TokenCard";
@@ -45,6 +46,34 @@ const SORTS: { id: SortId; label: string }[] = [
 
 type Slot0 = readonly [bigint, number, number, number, number, number, boolean];
 
+interface CachedMarketCap {
+  eth: number;
+  usd?: number;
+  updatedAt: number;
+}
+
+const MARKET_CAP_CACHE_KEY = "potatopad:market-caps:v1";
+const MARKET_CAP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readMarketCapCache(): Record<string, CachedMarketCap> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MARKET_CAP_CACHE_KEY) ?? "{}") as Record<
+      string,
+      CachedMarketCap
+    >;
+    const cutoff = Date.now() - MARKET_CAP_CACHE_TTL_MS;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([, value]) =>
+          Number.isFinite(value?.eth) && value.eth > 0 && value.updatedAt >= cutoff,
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
 function CardSkeleton() {
   return (
     <div className="overflow-hidden rounded-[28px] bg-neutral-900/40 ring-1 ring-white/[0.07]">
@@ -64,7 +93,13 @@ export default function DiscoverPage() {
   const { query, setQuery } = useSearch();
   const [tab, setTab] = useState<TabId>("growing");
   const [sort, setSort] = useState<SortId>("mcap");
+  const [cachedMarketCaps, setCachedMarketCaps] = useState<Record<string, CachedMarketCap>>({});
   const isAncientTab = tab === "ancient";
+  const { usd: ethUsd } = useEthUsdPrice();
+
+  useEffect(() => {
+    setCachedMarketCaps(readMarketCapCache());
+  }, []);
 
   // PotatoPad launches — span ALL pads (curve + direct/legacy). Robinhood-pinned.
   const { creations, unavailable: launchUnavailable, isLoading: launchLoading } =
@@ -133,22 +168,34 @@ export default function DiscoverPage() {
       }),
     [creations, v4TokenReads],
   );
+  const v4StateReadIndexes = useMemo(
+    () => v4PoolIds.map((poolId, i) => (poolId ? i : -1)).filter((i) => i >= 0),
+    [v4PoolIds],
+  );
   const v4StateContracts = useMemo(
     () =>
-      v4PoolIds.map((poolId) => ({
+      v4StateReadIndexes.map((i) => ({
         address: v4Manager,
         abi: uniswapV4PoolManagerAbi,
         functionName: "extsload" as const,
-        args: [v4PoolStateSlot(poolId ?? ZERO_POOL_ID)],
+        args: [v4PoolStateSlot(v4PoolIds[i] ?? ZERO_POOL_ID)],
         chainId: ANALYTICS_CHAIN_ID,
       })),
-    [v4PoolIds, v4Manager],
+    [v4PoolIds, v4StateReadIndexes, v4Manager],
   );
   const { data: v4StateReads } = useReadContracts({
     contracts: v4StateContracts as never[],
     allowFailure: true,
-    query: { enabled: hasV4 && v4PoolIds.some((id) => !!id) },
+    query: { enabled: hasV4 && v4StateContracts.length > 0 },
   });
+  const v4StateByCreationIndex = useMemo(() => {
+    const map = new Map<number, Hex>();
+    v4StateReadIndexes.forEach((creationIndex, readIndex) => {
+      const stateWord = v4StateReads?.[readIndex]?.result as Hex | undefined;
+      if (stateWord) map.set(creationIndex, stateWord);
+    });
+    return map;
+  }, [v4StateReadIndexes, v4StateReads]);
 
   // The Uniswap pool to price each token from. Curve tokens (single-sided-v3) have
   // a live pool from block one — pre- AND post-migration — so use curves().pool;
@@ -169,28 +216,43 @@ export default function DiscoverPage() {
 
   // Pass 2: pool slot0 for each effective pool, index-aligned to `creations`.
   // Priced with RH_WETH so a wallet on another chain doesn't mis-price RH pools.
+  const poolReadIndexes = useMemo(
+    () =>
+      effectivePools
+        .map((address, i) => (creations[i]?.kind !== "v4" && address !== ZERO_ADDRESS ? i : -1))
+        .filter((i) => i >= 0),
+    [creations, effectivePools],
+  );
   const poolContracts = useMemo(
     () =>
-      effectivePools.map((address) => ({
-        address,
+      poolReadIndexes.map((i) => ({
+        address: effectivePools[i],
         abi: uniswapV3PoolAbi,
         functionName: "slot0" as const,
         chainId: ANALYTICS_CHAIN_ID,
       })),
-    [effectivePools],
+    [effectivePools, poolReadIndexes],
   );
 
   const { data: poolReads, refetch: refetchPoolReads } = useReadContracts({
     contracts: poolContracts as never[],
     allowFailure: true,
     query: {
-      enabled: isDeployed && effectivePools.some((p) => p !== ZERO_ADDRESS),
+      enabled: isDeployed && poolContracts.length > 0,
       // These ~39 pool reads multiply per visitor. Hold them 60s and don't refetch on
       // every window focus, to cut proxy/RPC load.
       staleTime: 60_000,
       refetchOnWindowFocus: false,
     },
   });
+  const poolSlot0ByCreationIndex = useMemo(() => {
+    const map = new Map<number, Slot0>();
+    poolReadIndexes.forEach((creationIndex, readIndex) => {
+      const slot0 = poolReads?.[readIndex]?.result as Slot0 | undefined;
+      if (slot0) map.set(creationIndex, slot0);
+    });
+    return map;
+  }, [poolReadIndexes, poolReads]);
 
   // Live buys: ONE Swap filter spans every pool (constant RPC cost). A buy
   // bumps its token to the front of "Recent buys" and refreshes pool prices
@@ -227,18 +289,32 @@ export default function DiscoverPage() {
         // (read via extsload against the resolved PoolId) instead.
         let sqrtPriceX96: bigint | undefined;
         if (c.kind === "v4") {
-          const stateWord = v4StateReads?.[i]?.result as Hex | undefined;
+          const stateWord = v4StateByCreationIndex.get(i);
           sqrtPriceX96 = v4SqrtPriceFromSlot(stateWord);
         } else {
-          const slot0 = poolReads?.[i]?.result as Slot0 | undefined;
+          const slot0 = poolSlot0ByCreationIndex.get(i);
           sqrtPriceX96 = slot0?.[0];
         }
-        // Failed / missing price → null (never coerce unknown price to 0 ETH).
+        const cached = cachedMarketCaps[c.token.toLowerCase()];
+        // Failed / missing live price falls back to the last valid snapshot so
+        // returning visitors never wait on the RPC before seeing an FDV.
         let priceWeth: number | null = null;
         if (sqrtPriceX96 !== undefined && sqrtPriceX96 > 0n) {
           const p = priceWethPerToken(sqrtPriceX96, tokenIsToken0(c.token, RH_WETH));
           priceWeth = Number.isFinite(p) && p > 0 ? p : null;
         }
+        const marketCapEth =
+          priceWeth != null
+            ? priceWeth * TOTAL_SUPPLY_WHOLE
+            : c.marketCapEth > 0
+              ? c.marketCapEth
+              : (cached?.eth ?? null);
+        const marketCapUsd =
+          ethUsd !== null && marketCapEth != null
+            ? marketCapEth * ethUsd
+            : c.marketCapUsd > 0
+              ? c.marketCapUsd
+              : cached?.usd;
         return {
           address: c.token,
           name: c.name,
@@ -247,8 +323,9 @@ export default function DiscoverPage() {
           creatorName: creatorProfiles?.[c.creator.toLowerCase()]?.username,
           // Curve tokens price from curves().pool; direct tokens from the event pool.
           pool: effectivePools[i],
-          priceWeth,
-          marketCapEth: priceWeth != null ? priceWeth * TOTAL_SUPPLY_WHOLE : null,
+          priceWeth: priceWeth ?? (marketCapEth ? marketCapEth / TOTAL_SUPPLY_WHOLE : null),
+          marketCapEth,
+          marketCapUsd,
           createdAt: c.timestamp,
           imageURI: c.imageURI,
           volume24Usd: c.volume24Usd,
@@ -258,8 +335,40 @@ export default function DiscoverPage() {
           curveProgressBps: onCurve ? (curveProg ?? 0n) : undefined,
         };
       }),
-    [creations, curveReads, poolReads, v4StateReads, effectivePools, creatorProfiles, lastBuyAt],
+    [
+      creations,
+      curveReads,
+      poolSlot0ByCreationIndex,
+      v4StateByCreationIndex,
+      effectivePools,
+      creatorProfiles,
+      cachedMarketCaps,
+      ethUsd,
+      lastBuyAt,
+    ],
   );
+
+  useEffect(() => {
+    if (padRows.length === 0) return;
+    const now = Date.now();
+    const next: Record<string, CachedMarketCap> = {};
+    for (const row of padRows) {
+      if (row.marketCapEth == null || !Number.isFinite(row.marketCapEth) || row.marketCapEth <= 0) {
+        continue;
+      }
+      next[row.address.toLowerCase()] = {
+        eth: row.marketCapEth,
+        usd: row.marketCapUsd,
+        updatedAt: now,
+      };
+    }
+    if (Object.keys(next).length === 0) return;
+    try {
+      window.localStorage.setItem(MARKET_CAP_CACHE_KEY, JSON.stringify(next));
+    } catch {
+      // Storage is an acceleration only; live reads remain the source of truth.
+    }
+  }, [padRows]);
 
   const ancientRows = useMemo<TokenRow[]>(
     () =>
@@ -312,7 +421,12 @@ export default function DiscoverPage() {
         return [...list].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
       case "mcap":
         // Null FDVs sort last (unknown ≠ zero).
-        return [...list].sort((a, b) => (b.marketCapEth ?? -1) - (a.marketCapEth ?? -1));
+        return [...list].sort((a, b) => {
+          if (a.marketCapEth != null || b.marketCapEth != null) {
+            return (b.marketCapEth ?? -1) - (a.marketCapEth ?? -1);
+          }
+          return (b.marketCapUsd ?? -1) - (a.marketCapUsd ?? -1);
+        });
       default:
         return list;
     }
