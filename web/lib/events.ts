@@ -18,9 +18,9 @@ import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 // localStorage cache for the launch feed (bigint-safe).
 // ---------------------------------------------------------------------------
 
-// v3: CreationEvent gained a `kind` field (curve vs direct); bump so stale v2
-// caches (which lack it) are ignored rather than painting kind-less rows.
-const LAUNCH_CACHE_PREFIX = "potatopad:launch:v3:";
+// v4 includes server-precomputed market caps. Do not paint legacy cached cards
+// without valuation while the enriched feed is still loading.
+const LAUNCH_CACHE_PREFIX = "potatopad:launch:v4:";
 /** Age a seeded fresh payload into "stale" after this (2 × server ~90s TTL). */
 const CLIENT_FRESH_MAX_MS = 180_000;
 
@@ -183,10 +183,7 @@ export function useLaunchActivity() {
       });
 
       try {
-        const res = await fetch("/api/tokens", {
-          cache: "no-store",
-          signal: AbortSignal.timeout(15_000),
-        });
+        const res = await fetch("/api/tokens", { signal: AbortSignal.timeout(15_000) });
         if (!res.ok) {
           if (previous && previous.creations.length > 0) return asStale(previous);
           return {

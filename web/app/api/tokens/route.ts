@@ -5,14 +5,15 @@ import { loadFeed } from "@/lib/tokenFeed";
  * Server-side, cached Discover feed. The scan + cache live in `@/lib/tokenFeed`
  * so the token page's metadata and OG image share the same one-scan-per-TTL feed.
  *
- * `private, no-store` so shared caches never freeze `servedAt` (rolling windows
- * and stale labels depend on a per-response clock).
+ * Cache briefly at the shared edge so a cold Railway process or full chain scan
+ * never sits in the critical path for every first-time visitor. The server feed
+ * still refreshes in the background and new launches propagate within seconds.
  */
 
 export const runtime = "nodejs";
 
 const CACHE_HEADERS = {
-  "Cache-Control": "private, no-store",
+  "Cache-Control": "public, s-maxage=10, stale-while-revalidate=300",
 };
 
 export async function GET() {
