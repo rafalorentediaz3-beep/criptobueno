@@ -87,16 +87,16 @@ export function HarvestCard({
   // so its swap fees are collectable/claimable from block one — even pre-bond.
   const { address: user, isConnected } = useAccount();
   const { weth, chainId } = usePad();
+  const isCreator = !!user && user.toLowerCase() === creator.toLowerCase();
   const collectTx = useTx();
   const claimWethTx = useTx();
   const claimTokenTx = useTx();
-  const accrued = useAccruedFees(lpTokenId, pool, pad, isV4);
 
   const { data: locker } = useReadContract({
     address: pad,
     abi: isV4 ? potatoV4PadAbi : potatoPadAbi,
     functionName: "locker",
-    query: { enabled: pad !== ZERO_ADDRESS },
+    query: { enabled: isConnected && pad !== ZERO_ADDRESS },
   });
 
   const lockerAddr = (locker as Address | undefined) ?? ZERO_ADDRESS;
@@ -107,9 +107,12 @@ export function HarvestCard({
     address: lockerAddr,
     abi: lockerAbi,
     functionName: "treasury",
-    query: { enabled: lockerReady },
+    query: { enabled: isConnected && lockerReady },
   });
   const treasury = (treasuryData as Address | undefined) ?? ZERO_ADDRESS;
+  const isTreasury = !!user && user.toLowerCase() === treasury.toLowerCase();
+  const canManageFees = isCreator || isTreasury;
+  const accrued = useAccruedFees(lpTokenId, pool, pad, isV4, canManageFees);
 
   const {
     data: creatorClaimableWeth,
@@ -120,7 +123,10 @@ export function HarvestCard({
     abi: lockerAbi,
     functionName: "claimable",
     args: [weth, creator],
-    query: { enabled: lockerReady && weth !== ZERO_ADDRESS, refetchInterval: 15_000 },
+    query: {
+      enabled: canManageFees && lockerReady && weth !== ZERO_ADDRESS,
+      refetchInterval: 30_000,
+    },
   });
 
   const {
@@ -132,10 +138,8 @@ export function HarvestCard({
     abi: lockerAbi,
     functionName: "claimable",
     args: [token, creator],
-    query: { enabled: lockerReady && tokenReady, refetchInterval: 15_000 },
+    query: { enabled: canManageFees && lockerReady && tokenReady, refetchInterval: 30_000 },
   });
-
-  const isCreator = !!user && user.toLowerCase() === creator.toLowerCase();
 
   const claimableWeth = (creatorClaimableWeth as bigint | undefined) ?? 0n;
   const claimableToken = (creatorClaimableToken as bigint | undefined) ?? 0n;
@@ -378,7 +382,6 @@ export function HarvestCard({
     }
   }, [flow, claimWethTx.reverted, claimWethTx.error, claimTokenTx.reverted, claimTokenTx.error]);
 
-  const isTreasury = !!user && user.toLowerCase() === treasury.toLowerCase();
   if (!isCreator && !isTreasury) return null;
 
   let label: string;

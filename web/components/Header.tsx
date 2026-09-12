@@ -2,6 +2,7 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { LogOut, User, Wallet } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
@@ -28,10 +29,14 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-neutral-900/65 shadow-[0_8px_30px_-24px_rgba(0,0,0,0.75)] backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-[76px] w-full max-w-6xl items-center gap-5 px-4 sm:px-6">
         <Link href="/" className="flex min-w-0 shrink-0 items-center">
-          <img
+          <Image
             src="/header-logo.png"
             alt="Site logo"
-            className="h-14 w-auto max-w-[240px] object-contain sm:h-16 sm:max-w-[280px]"
+            width={64}
+            height={64}
+            sizes="(min-width: 640px) 64px, 56px"
+            priority
+            className="h-14 w-14 object-contain sm:h-16 sm:w-16"
           />
         </Link>
 

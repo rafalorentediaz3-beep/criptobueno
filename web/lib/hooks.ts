@@ -290,6 +290,12 @@ export function useTokenPad(token: Address | undefined, hint?: TokenPadHint): Re
   const chainId = useChainId();
   const pads = useMemo(() => allPadDeployments(chainId), [chainId]);
   const curvePad = CURVE_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
+  const completeHint =
+    hint?.kind === "v4"
+      ? !!hint.poolId
+      : hint?.kind === "direct"
+        ? hint.pool !== ZERO_ADDRESS
+        : false;
 
   const { data, isLoading } = useReadContracts({
     allowFailure: true,
@@ -304,7 +310,7 @@ export function useTokenPad(token: Address | undefined, hint?: TokenPadHint): Re
           ? { address: p.address, abi: potatoV4PadAbi, functionName: "v4Tokens", args: [token ?? ZERO_ADDRESS] }
           : { address: p.address, abi: potatoPadAbi, functionName: "tokens", args: [token ?? ZERO_ADDRESS] },
     ),
-    query: { enabled: !!token && pads.length > 0 },
+    query: { enabled: !!token && pads.length > 0 && !completeHint },
   });
 
   return useMemo(() => {

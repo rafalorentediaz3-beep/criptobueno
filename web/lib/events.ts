@@ -138,7 +138,7 @@ const EMPTY_LAUNCH: LaunchActivity = {
  * PotatoPad launch feed — always Robinhood (4663) server scan, independent of
  * the connected wallet chain. Discover, ticker, and creator profiles share this.
  */
-export function useLaunchActivity() {
+export function useLaunchActivity({ live = true }: { live?: boolean } = {}) {
   // Pad addresses come from the CONNECTED chain purely to drive the live event
   // watches below; the feed itself stays pinned to Robinhood (see docstring) so
   // profiles and the ticker work no matter what chain the wallet is on.
@@ -156,13 +156,14 @@ export function useLaunchActivity() {
   const query = useQuery<LaunchActivity>({
     queryKey,
     enabled: true,
-    staleTime: 5_000,
+    staleTime: 30_000,
     gcTime: 24 * 60 * 60 * 1000,
     // Keep launch history live even when the wallet is idle. Contract watches
     // provide fast updates; polling is the fallback after reconnects or missed
     // websocket notifications from the public RPC.
-    refetchInterval: 10_000,
-    refetchOnWindowFocus: true,
+    refetchInterval: (q) =>
+      q.state.data?.state === "unavailable" ? 10_000 : live ? 60_000 : false,
+    refetchOnWindowFocus: live,
     // Prefer a warm local snapshot over a blank unavailable frame while revalidating.
     placeholderData: () => {
       const cached = readLaunchCache(cacheKey);
@@ -273,21 +274,21 @@ export function useLaunchActivity() {
     address: curvePad,
     abi: potatoCurvePadAbi,
     eventName: "TokenCreated",
-    enabled: curvePad !== ZERO_ADDRESS,
+    enabled: live && curvePad !== ZERO_ADDRESS,
     onLogs: () => queryClient.invalidateQueries({ queryKey }),
   });
   useWatchContractEvent({
     address: directPad,
     abi: potatoPadAbi,
     eventName: "TokenCreated",
-    enabled: directPad !== ZERO_ADDRESS,
+    enabled: live && directPad !== ZERO_ADDRESS,
     onLogs: () => queryClient.invalidateQueries({ queryKey }),
   });
   useWatchContractEvent({
     address: v4Pad,
     abi: potatoV4PadAbi,
     eventName: "TokenCreated",
-    enabled: v4Pad !== ZERO_ADDRESS,
+    enabled: live && v4Pad !== ZERO_ADDRESS,
     onLogs: () => queryClient.invalidateQueries({ queryKey }),
   });
 

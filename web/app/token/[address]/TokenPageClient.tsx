@@ -33,7 +33,7 @@ export default function TokenPageClient() {
 
   // Start from the server-resolved launch snapshot, then verify it on-chain in
   // the background. Navigation no longer waits for every historical pad read.
-  const { creationByToken } = useLaunchActivity();
+  const { creationByToken } = useLaunchActivity({ live: false });
   const creation = token ? creationByToken.get(token.toLowerCase()) : undefined;
   const resolved = useTokenPad(
     token,
@@ -246,6 +246,7 @@ export default function TokenPageClient() {
           symbol={symbol}
           creator={creator}
           chainId={chainId}
+          launchMeta={creation}
         />
         {/* Exchange-style stat strip: the numbers traders scan first, above the chart. */}
         <StatsCard
@@ -276,6 +277,7 @@ export default function TokenPageClient() {
           pool={pool}
           symbol={symbol ?? ""}
           isV4={isV4}
+          startBlock={creation?.blockNumber}
         />
       </div>
 
@@ -295,7 +297,9 @@ export default function TokenPageClient() {
           bonded={resolved.bonded}
         />
         {/* Renders only for holder-rewards launches; a no-op otherwise. */}
-        <HolderRewardsCard token={token} symbol={symbol} pad={resolved.pad} chainId={chainId} />
+        {!isV4 && (
+          <HolderRewardsCard token={token} symbol={symbol} pad={resolved.pad} chainId={chainId} />
+        )}
         <HarvestCard
           creator={creator}
           lpTokenId={lpTokenId}

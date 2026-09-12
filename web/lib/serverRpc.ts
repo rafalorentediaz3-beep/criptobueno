@@ -60,7 +60,9 @@ function shuffled(a: string[]): string[] {
 export function robinhoodServerTransport(): Transport {
   const urls = [...new Set([...shuffled(robinhoodPrimaryPool()), ...robinhoodFallbacks(), PUBLIC_RPC])];
   return fallback(
-    urls.map((u) => http(u, { timeout: 12_000 })),
+    // Healthy Robinhood RPCs answer in well under a second. A dead configured
+    // node used to block every server read for 12s before failover.
+    urls.map((u) => http(u, { timeout: 2_500 })),
     { rank: false },
   );
 }

@@ -140,21 +140,38 @@ export default function DiscoverPage() {
   // array indices stay aligned to `creations` without a second bookkeeping pass.
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[ANALYTICS_CHAIN_ID] ?? ZERO_ADDRESS;
   const hasV4 = v4Manager !== ZERO_ADDRESS && creations.some((c) => c.kind === "v4");
+  const v4TokenReadIndexes = useMemo(
+    () =>
+      creations
+        .map((c, i) => (c.kind === "v4" && !c.poolId ? i : -1))
+        .filter((i) => i >= 0),
+    [creations],
+  );
   const v4TokenContracts = useMemo(
     () =>
-      creations.map((c) => ({
-        address: c.pad,
+      v4TokenReadIndexes.map((i) => ({
+        address: creations[i].pad,
         abi: potatoV4PadAbi,
         functionName: "v4Tokens" as const,
-        args: [c.token],
+        args: [creations[i].token],
       })),
-    [creations],
+    [creations, v4TokenReadIndexes],
   );
   const { data: v4TokenReads } = useReadContracts({
     contracts: v4TokenContracts as never[],
     allowFailure: true,
-    query: { enabled: isDeployed && hasV4 },
+    query: { enabled: isDeployed && hasV4 && v4TokenContracts.length > 0 },
   });
+  const resolvedV4PoolIds = useMemo(() => {
+    const map = new Map<number, Hex>();
+    v4TokenReadIndexes.forEach((creationIndex, readIndex) => {
+      const info = v4TokenReads?.[readIndex]?.result as
+        | readonly [Address, Hex, bigint, number]
+        | undefined;
+      if (info?.[0] && info[0] !== ZERO_ADDRESS) map.set(creationIndex, info[1]);
+    });
+    return map;
+  }, [v4TokenReadIndexes, v4TokenReads]);
 
   // v4Tokens() => (creator, poolId, lpTokenId, feeTier); poolId undefined when
   // the creation isn't (yet) resolved as a v4 token — that read is skipped below.
@@ -163,10 +180,9 @@ export default function DiscoverPage() {
     () =>
       creations.map((c, i) => {
         if (c.kind !== "v4") return undefined;
-        const info = v4TokenReads?.[i]?.result as readonly [Address, Hex, bigint, number] | undefined;
-        return info?.[0] && info[0] !== ZERO_ADDRESS ? info[1] : undefined;
+        return c.poolId ?? resolvedV4PoolIds.get(i);
       }),
-    [creations, v4TokenReads],
+    [creations, resolvedV4PoolIds],
   );
   const v4StateReadIndexes = useMemo(
     () => v4PoolIds.map((poolId, i) => (poolId ? i : -1)).filter((i) => i >= 0),

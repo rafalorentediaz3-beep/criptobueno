@@ -26,6 +26,7 @@ export function TokenTraders({
   pool,
   symbol,
   isV4,
+  startBlock,
 }: {
   token: Address;
   poolId?: Hex;
@@ -33,13 +34,20 @@ export function TokenTraders({
   pool: Address;
   symbol: string;
   isV4: boolean;
+  startBlock?: bigint;
 }) {
   const client = usePublicClient();
   const [tab, setTab] = useState<"trades" | "holders">(isV4 ? "trades" : "holders");
   const { holders, total, unavailable, isLoading } = useTokenHolders(token, isV4 ? "v4" : undefined);
   const topHolders = holders.slice(0, 10);
   const { usd: ethUsd } = useEthUsdPrice();
-  const tradesQuery = useV4SwapHistory(token, poolId, isV4 && tab === "trades" && !!client, 15_000);
+  const tradesQuery = useV4SwapHistory(
+    token,
+    poolId,
+    isV4 && tab === "trades" && !!client,
+    30_000,
+    startBlock,
+  );
   const trades = (tradesQuery.data?.points ?? []).slice().reverse().slice(0, 50);
 
   function holderStatus(address: Address) {

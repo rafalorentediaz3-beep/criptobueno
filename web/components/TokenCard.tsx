@@ -69,7 +69,11 @@ function TokenCardImpl({
   if (row.ancient) {
     const vol = row.volume24Usd && row.volume24Usd > 0 ? formatUsd(row.volume24Usd) : "—";
     return (
-      <Link href={`/token/${row.address}`} className={cardShell} data-flip-key={row.address}>
+      <Link
+        href={`/token/${row.address}`}
+        className={cardShell}
+        data-flip-key={row.address}
+      >
         <div className="relative m-3 mb-0 overflow-hidden rounded-[20px]">
           <TokenAvatar address={row.address} symbol={row.symbol} imageURI={row.imageURI} fill />
           <span className={`absolute left-2 top-2 ${badge}`}>Ancient</span>

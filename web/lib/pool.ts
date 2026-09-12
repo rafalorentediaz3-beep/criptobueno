@@ -363,7 +363,7 @@ export function usePoolStats(
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
       { address: weth, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? weth] },
     ],
-    query: { enabled, refetchInterval: 15_000 },
+    query: { enabled, staleTime: 15_000, refetchInterval: 30_000 },
   });
 
   return useMemo<PoolStats>(() => {
@@ -586,6 +586,7 @@ export function useAccruedFees(
   pool: Address | undefined,
   pad: Address | undefined,
   isV4 = false,
+  active = true,
 ): AccruedFees {
   const { weth, chainId } = usePad();
   const client = usePublicClient();
@@ -594,7 +595,7 @@ export function useAccruedFees(
   // token page resolves it and passes it in). A legacy token's LP position is
   // owned by the legacy pad's locker, so using the primary pad's locker here
   // would make the collect-simulate revert and report zero fees.
-  const padReady = !!pad && pad !== ZERO_ADDRESS;
+  const padReady = active && !!pad && pad !== ZERO_ADDRESS;
   const { data: lockerData } = useReadContract({
     address: pad,
     abi: isV4 ? potatoV4PadAbi : potatoPadAbi,
@@ -642,9 +643,9 @@ export function useAccruedFees(
 
   const query = useQuery<readonly [bigint, bigint] | null>({
     queryKey: ["accrued-fees", chainId, isV4, npm, locker, lpTokenId?.toString()],
-    enabled,
+    enabled: active && enabled,
     staleTime: 15_000,
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     queryFn: async () => {
       if (!client || !locker || lpTokenId === undefined) return null;
       try {
@@ -692,8 +693,10 @@ export function useAccruedFees(
       return {
         wethAmount: undefined,
         tokenAmount: undefined,
-        isLoading: enabled && (query.isLoading || token0 === undefined || (isV4 && token1 === undefined)),
-        unavailable: !enabled || query.data === null,
+        isLoading:
+          active && enabled &&
+          (query.isLoading || token0 === undefined || (isV4 && token1 === undefined)),
+        unavailable: !active || !enabled || query.data === null,
       };
     }
 
@@ -704,5 +707,5 @@ export function useAccruedFees(
       isLoading: false,
       unavailable: false,
     };
-  }, [query.data, query.isLoading, enabled, token0, token1, weth, isV4]);
+  }, [query.data, query.isLoading, enabled, token0, token1, weth, isV4, active]);
 }

@@ -31,6 +31,8 @@ const FALLBACKS = [...robinhoodFallbacks(), PUBLIC_RPC];
 // Round-robin cursor across the pool (module-level; approximate under concurrency,
 // which is fine — the goal is spreading load, not perfect fairness).
 let rrCursor = 0;
+const unhealthyUntil = new Map<string, number>();
+const UPSTREAM_COOLDOWN_MS = 30_000;
 
 // Denylist, not allowlist: block methods that could relay transactions or open
 // subscriptions through our key — plus ALL stateful filter methods. Filters
@@ -170,7 +172,10 @@ async function forward(bodyStr: string): Promise<{ status: number; text: string 
     for (let i = 0; i < n; i++) order.push(POOL[(start + i) % n]);
   }
   order.push(...FALLBACKS);
-  const tryList = [...new Set(order)];
+  const now = Date.now();
+  const all = [...new Set(order)];
+  const healthy = all.filter((url) => (unhealthyUntil.get(url) ?? 0) <= now);
+  const tryList = healthy.length > 0 ? healthy : [PUBLIC_RPC];
 
   let last: { status: number; text: string } | null = null;
   for (const url of tryList) {
@@ -183,12 +188,17 @@ async function forward(bodyStr: string): Promise<{ status: number; text: string 
         // Healthy upstreams answer in <200ms; without a per-fetch deadline a
         // hanging node makes the whole fallthrough chain stack to 15s+ and the
         // request pile-up is what actually takes the site down.
-        signal: AbortSignal.timeout(3_500),
+        signal: AbortSignal.timeout(2_000),
       });
       const text = await res.text();
-      if (res.status !== 429 && res.status < 500) return { status: res.status, text };
+      if (res.status !== 429 && res.status < 500) {
+        unhealthyUntil.delete(url);
+        return { status: res.status, text };
+      }
+      unhealthyUntil.set(url, Date.now() + UPSTREAM_COOLDOWN_MS);
       last = { status: res.status, text }; // 429 / 5xx — try the next upstream
     } catch {
+      unhealthyUntil.set(url, Date.now() + UPSTREAM_COOLDOWN_MS);
       // network error / timeout — try the next upstream
     }
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { imageProxyCandidates } from "@/lib/format";
 
@@ -36,8 +37,13 @@ export function ProfileAvatar({
     <div
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 shadow-[0_8px_20px_-12px_rgba(0,0,0,0.7)] ${box} ${className}`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/wallet-avatar.png" alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <Image
+        src="/wallet-avatar.png"
+        alt=""
+        fill
+        sizes={size === "lg" ? "80px" : size === "md" ? "48px" : "32px"}
+        className="object-cover"
+      />
       {src && (
         <>
           {loaded && <div className="absolute inset-0 bg-black" />}

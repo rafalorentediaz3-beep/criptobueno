@@ -21,7 +21,9 @@ interface TickerItem {
  */
 export function TickerStrip() {
   const { isDeployed } = usePad();
-  const { creations } = useLaunchActivity();
+  // Discover owns the live event watchers. The ticker shares its query cache
+  // without installing a second set of RPC subscriptions.
+  const { creations } = useLaunchActivity({ live: false });
 
   const items = useMemo<TickerItem[]>(() => {
     return creations

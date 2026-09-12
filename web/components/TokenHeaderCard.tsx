@@ -6,7 +6,7 @@ import { getAddress, isAddress, type Address } from "viem";
 import { imageProxyCandidates, normalizeSocialUrl } from "@/lib/format";
 import { SOCIAL_OVERRIDES } from "@/lib/config";
 import { useTokenDescription } from "@/lib/tokenMeta/useTokenDescription";
-import { useLaunchActivity } from "@/lib/events";
+import type { CreationEvent } from "@/lib/events";
 import { AddressChip } from "@/components/AddressChip";
 import { TokenAvatar } from "@/components/TokenAvatar";
 
@@ -18,6 +18,7 @@ export function TokenHeaderCard({
   chainId,
   ancient = false,
   imageURI,
+  launchMeta,
 }: {
   token: Address;
   name: string;
@@ -28,9 +29,10 @@ export function TokenHeaderCard({
   ancient?: boolean;
   /** Explicit logo (ancient tokens have no launch event to read imageURI from). */
   imageURI?: string;
+  /** Parent-owned feed snapshot; avoids another feed observer and RPC watchers. */
+  launchMeta?: CreationEvent;
 }) {
-  const { creationByToken } = useLaunchActivity();
-  const meta = creationByToken.get(token.toLowerCase());
+  const meta = launchMeta;
   const description = useTokenDescription(ancient ? undefined : token);
 
   // Click-to-enlarge: walk the same proxy-first candidate list the avatar uses,

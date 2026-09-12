@@ -28,7 +28,7 @@ const SCAN_CONCURRENCY = 3; // Robinhood's public RPC rate-limits bursty getLogs
 // Keep the server snapshot short-lived so profiles and Discover converge with
 // the chain shortly after a launch, while in-flight coalescing still prevents
 // every browser from starting its own RPC scan.
-const CACHE_TTL_MS = 10_000;
+const CACHE_TTL_MS = 30_000;
 const CHUNK_RETRIES = 3; // a window survives transient RPC blips instead of aborting the scan.
 // If more than this fraction of a pad's windows never succeed, the scan is too
 // incomplete to trust — flag `unavailable` so the client retries (vs. caching a
@@ -280,7 +280,7 @@ async function fetchMarketSnapshots(
       const res = await fetch(`${base}/tokens/multi/${chunk.join(",")}`, {
         headers,
         cache: "no-store",
-        signal: AbortSignal.timeout(6000), // a slow GT call must not stall the feed
+        signal: AbortSignal.timeout(2000), // optional enrichment must not stall the feed
       });
       if (!res.ok) continue;
       const j = (await res.json()) as {
