@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { decodeEventLog, parseAbiItem } from "viem";
-import type { Address, Hex } from "viem";
+import type { Address, Hex, Log } from "viem";
 import { usePublicClient } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import { usePad } from "@/lib/hooks";
@@ -40,12 +40,13 @@ export function useV4SwapHistory(
   poolId: Hex | undefined,
   enabled: boolean,
   refetchIntervalMs: number,
+  fromBlockHint?: bigint,
 ) {
   const { chainId, weth } = usePad();
   const client = usePublicClient();
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
-  // One-time backfill depth when a pool is first opened.
-  const FETCH_BLOCKS = 5_000_000n;
+  const FALLBACK_BLOCKS = 250_000n;
+  const LOG_CHUNK = 9_000n;
   const cacheRef = useRef<{
     key: string;
     points: V4SwapPoint[];
@@ -54,7 +55,7 @@ export function useV4SwapHistory(
   } | null>(null);
 
   return useQuery({
-    queryKey: ["v4-swap-history", chainId, poolId, weth],
+    queryKey: ["v4-swap-history", chainId, poolId, weth, fromBlockHint?.toString()],
     enabled: enabled && !!poolId && !!client,
     refetchInterval: refetchIntervalMs,
     queryFn: async () => {
@@ -67,15 +68,39 @@ export function useV4SwapHistory(
       }
       const latest = await client.getBlockNumber();
       const fromBlock =
-        cache.lastBlock < 0n ? (latest > FETCH_BLOCKS ? latest - FETCH_BLOCKS : 0n) : cache.lastBlock + 1n;
+        cache.lastBlock < 0n
+          ? fromBlockHint !== undefined && fromBlockHint <= latest
+            ? fromBlockHint
+            : latest > FALLBACK_BLOCKS
+              ? latest - FALLBACK_BLOCKS
+              : 0n
+          : cache.lastBlock + 1n;
       if (fromBlock <= latest) {
-        const logs = await client.getLogs({
-          address: v4Manager,
-          event: v4SwapEvent,
-          args: { id: poolId },
-          fromBlock,
-          toBlock: latest,
-        });
+        // Robinhood providers cap getLogs ranges around 10k blocks. The old
+        // five-million-block request failed on every first detail-page visit.
+        const logs: Log[] = [];
+        const windows: { fromBlock: bigint; toBlock: bigint }[] = [];
+        for (let from = fromBlock; from <= latest; from += LOG_CHUNK + 1n) {
+          windows.push({
+            fromBlock: from,
+            toBlock: from + LOG_CHUNK < latest ? from + LOG_CHUNK : latest,
+          });
+        }
+        for (let i = 0; i < windows.length; i += 3) {
+          const chunks = await Promise.all(
+            windows.slice(i, i + 3).map((window) =>
+              client
+                .getLogs({
+                  address: v4Manager,
+                  event: v4SwapEvent,
+                  args: { id: poolId },
+                  ...window,
+                })
+                .catch(() => []),
+            ),
+          );
+          for (const chunk of chunks) logs.push(...chunk);
+        }
         if (logs.length > 0) {
           const uniqueBlocks = Array.from(new Set(logs.map((log) => log.blockNumber ?? 0n))).filter(
             (b) => !cache!.blockTsCache.has(b.toString()),

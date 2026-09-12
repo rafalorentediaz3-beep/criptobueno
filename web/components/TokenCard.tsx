@@ -114,12 +114,14 @@ function TokenCardImpl({
     row.lastBuyAt !== undefined && Date.now() - row.lastBuyAt < BUY_FLASH_WINDOW_MS;
 
   return (
-    <article className={cardShell} data-flip-key={row.address}>
+    <Link
+      href={`/token/${row.address}`}
+      className={cardShell}
+      data-flip-key={row.address}
+      aria-label={`Open ${row.name || row.symbol}`}
+    >
       {freshBuy && <span key={`ring-${row.lastBuyAt}`} aria-hidden className="buy-flash-ring" />}
-      <Link
-        href={`/token/${row.address}`}
-        className="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60"
-      >
+      <div className="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60">
         <div className="relative m-3 mb-0 overflow-hidden rounded-[20px]">
           <TokenAvatar address={row.address} symbol={row.symbol} imageURI={row.imageURI} fill />
           {/* Only migration earns a badge; a bonding curve is already told by its
@@ -169,8 +171,8 @@ function TokenCardImpl({
             )}
           </div>
         </div>
-      </Link>
-    </article>
+      </div>
+    </Link>
   );
 }
 

@@ -14,6 +14,7 @@ export function StatsCard({
   marketCapEth,
   onCurve = false,
   progressBps = 0n,
+  volume24Usd: initialVolume24Usd,
   variant = "card",
 }: {
   token: Address;
@@ -27,12 +28,15 @@ export function StatsCard({
   onCurve?: boolean;
   /** Curve progress toward the fill/migration price, 0–10000 bps (only when onCurve). */
   progressBps?: bigint;
+  /** Feed snapshot shown immediately while the per-pool request refreshes. */
+  volume24Usd?: number;
   /** "card": sidebar box with heading. "strip": horizontal row for the page top. */
   variant?: "card" | "strip";
 }) {
   const { holders, unavailable: holdersUnavailable } = useTokenHolders(token);
   const { usd: ethUsd } = useEthUsdPrice();
-  const volume24Usd = usePoolVolume24h(chainId, pool);
+  const liveVolume24Usd = usePoolVolume24h(chainId, pool);
+  const volume24Usd = liveVolume24Usd ?? initialVolume24Usd ?? 0;
 
   const marketCapUsd = ethUsd !== null ? marketCapEth * ethUsd : null;
 
@@ -53,7 +57,7 @@ export function StatsCard({
     },
     {
       label: "Volume",
-      value: volume24Usd !== null && volume24Usd > 0 ? formatUsd(volume24Usd) : "—",
+      value: volume24Usd > 0 ? formatUsd(volume24Usd) : "$0",
       sub: "24h",
     },
     {

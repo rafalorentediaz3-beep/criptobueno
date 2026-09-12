@@ -6,7 +6,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 import { useWatchContractEvent } from "wagmi";
 import { potatoCurvePadAbi, potatoPadAbi, potatoV4PadAbi } from "@/lib/abi";
 import { allPadDeployments, isHiddenToken, ZERO_ADDRESS, type PadKind } from "@/lib/config";
@@ -60,6 +60,9 @@ export interface CreationEvent {
   marketCapUsd: number;
   /** Cached on-chain FDV in ETH used before browser RPC reads finish. */
   marketCapEth: number;
+  poolId?: Hex;
+  feeTier?: number;
+  lpTokenId?: bigint;
   /** "curve" (bonding curve) or "direct" (legacy direct-to-Uniswap). */
   kind: PadKind;
 }
@@ -217,6 +220,9 @@ export function useLaunchActivity() {
           volume24Usd: c.volume24Usd ?? 0,
           marketCapUsd: c.marketCapUsd ?? 0,
           marketCapEth: c.marketCapEth ?? 0,
+          poolId: c.poolId,
+          feeTier: c.feeTier,
+          lpTokenId: c.lpTokenId ? BigInt(c.lpTokenId) : undefined,
           kind: c.kind ?? "direct", // backward-compat for any kind-less payload
         }));
         const state: FeedState =

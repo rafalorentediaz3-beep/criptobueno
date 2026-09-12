@@ -70,6 +70,10 @@ export interface CreationDTO {
   marketCapUsd: number;
   /** On-chain FDV in ETH, precomputed for instant card rendering. */
   marketCapEth: number;
+  /** V4 resolution data lets token detail render before browser RPC reads finish. */
+  poolId?: Hex;
+  feeTier?: number;
+  lpTokenId?: string;
   /** Which pad kind launched it: curve, legacy direct, or direct-to-v4. */
   kind: PadKind;
 }
@@ -200,10 +204,17 @@ function v4StateSlot(poolId: Hex): Hex {
   return keccak256(encodePacked(["bytes32", "uint256"], [poolId, 6n]));
 }
 
+interface V4Snapshot {
+  marketCapEth: number;
+  poolId: Hex;
+  feeTier: number;
+  lpTokenId: bigint;
+}
+
 async function fetchV4MarketCaps(
   tokens: { token: Address; pad: Address }[],
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+): Promise<Map<string, V4Snapshot>> {
+  const out = new Map<string, V4Snapshot>();
   const manager = V4_POOL_MANAGER_ADDRESSES[robinhoodChain.id];
   const weth = WETH_ADDRESSES[robinhoodChain.id];
   if (!manager || !weth || tokens.length === 0) return out;
@@ -219,7 +230,9 @@ async function fetchV4MarketCaps(
   });
   const resolved = tokens.flatMap((entry, index) => {
     const value = tokenReads[index]?.result as readonly [Address, Hex, bigint, number] | undefined;
-    return value?.[0] && value[0] !== ZERO_ADDRESS ? [{ ...entry, poolId: value[1] }] : [];
+    return value?.[0] && value[0] !== ZERO_ADDRESS
+      ? [{ ...entry, poolId: value[1], lpTokenId: value[2], feeTier: Number(value[3]) }]
+      : [];
   });
   if (resolved.length === 0) return out;
 
@@ -232,17 +245,18 @@ async function fetchV4MarketCaps(
       args: [v4StateSlot(poolId)],
     })),
   });
-  resolved.forEach(({ token }, index) => {
+  resolved.forEach(({ token, poolId, lpTokenId, feeTier }, index) => {
     const word = stateReads[index]?.result as Hex | undefined;
     const sqrtPriceX96 = word ? BigInt(word) & ((1n << 160n) - 1n) : 0n;
-    if (sqrtPriceX96 <= 0n) return;
-    const ratio = Number(sqrtPriceX96) / Q96;
-    const rawPrice = ratio * ratio;
-    const priceWeth = BigInt(token) < BigInt(weth) ? rawPrice : 1 / rawPrice;
-    const marketCapEth = priceWeth * TOTAL_SUPPLY_WHOLE;
-    if (Number.isFinite(marketCapEth) && marketCapEth > 0) {
-      out.set(token.toLowerCase(), marketCapEth);
+    let marketCapEth = 0;
+    if (sqrtPriceX96 > 0n) {
+      const ratio = Number(sqrtPriceX96) / Q96;
+      const rawPrice = ratio * ratio;
+      const priceWeth = BigInt(token) < BigInt(weth) ? rawPrice : 1 / rawPrice;
+      const calculated = priceWeth * TOTAL_SUPPLY_WHOLE;
+      if (Number.isFinite(calculated) && calculated > 0) marketCapEth = calculated;
     }
+    out.set(token.toLowerCase(), { marketCapEth, poolId, lpTokenId, feeTier });
   });
   return out;
 }
@@ -391,7 +405,7 @@ async function scan(): Promise<FeedPayload> {
         ? [{ token: log.args.token, pad }]
         : [],
     ),
-  ).catch(() => new Map<string, number>());
+  ).catch(() => new Map<string, V4Snapshot>());
   await Promise.all([timestampTask, marketTask, v4MarketCapTask]);
 
   // A token belongs to exactly one pad; dedupe by token address.
@@ -430,7 +444,11 @@ async function scan(): Promise<FeedPayload> {
     const market = markets.get(c.token.toLowerCase());
     c.volume24Usd = market?.volume24Usd ?? 0;
     c.marketCapUsd = market?.marketCapUsd ?? 0;
-    c.marketCapEth = v4MarketCaps.get(c.token.toLowerCase()) ?? 0;
+    const v4 = v4MarketCaps.get(c.token.toLowerCase());
+    c.marketCapEth = v4?.marketCapEth ?? 0;
+    c.poolId = v4?.poolId;
+    c.feeTier = v4?.feeTier;
+    c.lpTokenId = v4?.lpTokenId.toString();
   }
   // A partial scan (some window failed) surfaces as "unavailable" so the client
   // shows a warm cache rather than treating a truncated list as complete.

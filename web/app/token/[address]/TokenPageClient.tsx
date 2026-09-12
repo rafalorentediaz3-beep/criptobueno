@@ -8,6 +8,7 @@ import { useReadContracts } from "wagmi";
 import { potatoTokenAbi } from "@/lib/abi";
 import { ZERO_ADDRESS } from "@/lib/config";
 import { useAncientTokens } from "@/lib/ancient";
+import { useLaunchActivity } from "@/lib/events";
 import { usePad, useTokenPad } from "@/lib/hooks";
 import { useCurveStats, usePoolStats } from "@/lib/pool";
 import { formatUsd } from "@/lib/format";
@@ -30,16 +31,32 @@ export default function TokenPageClient() {
 
   const { chainId, isDeployed } = usePad();
 
-  // Resolve which pad (curve, direct, or legacy) launched this token, and its info.
-  const resolved = useTokenPad(token);
-  // Live curve state (price / progress) for a bonding-curve token.
-  const curve = useCurveStats(token);
+  // Start from the server-resolved launch snapshot, then verify it on-chain in
+  // the background. Navigation no longer waits for every historical pad read.
+  const { creationByToken } = useLaunchActivity();
+  const creation = token ? creationByToken.get(token.toLowerCase()) : undefined;
+  const resolved = useTokenPad(
+    token,
+    creation
+      ? {
+          kind: creation.kind,
+          pad: creation.pad,
+          creator: creation.creator,
+          pool: creation.pool,
+          poolId: creation.poolId,
+          feeTier: creation.feeTier,
+          lpTokenId: creation.lpTokenId,
+        }
+      : undefined,
+  );
+  const isCurve = resolved.kind === "curve";
+  const isV4 = resolved.kind === "v4";
+  // Do not issue curve-pad reads for V4/direct tokens.
+  const curve = useCurveStats(isCurve ? token : undefined);
   // If no pad claims it, it may be a pre-existing "ancient" Robinhood token.
   const { byAddress: ancientByAddress, isLoading: ancientLoading } = useAncientTokens();
   const ancient = token ? ancientByAddress.get(token.toLowerCase()) : undefined;
 
-  const isCurve = resolved.kind === "curve";
-  const isV4 = resolved.kind === "v4";
   const onCurve = isCurve && !resolved.bonded; // pre-bond curve phase (still trades on Uniswap)
   const isAncient = !resolved.resolved && !!ancient;
   const creator = resolved.creator;
@@ -70,8 +87,14 @@ export default function TokenPageClient() {
     pool !== ZERO_ADDRESS ? pool : undefined,
     isV4 ? resolved.poolId : undefined,
   );
-  const priceWeth = poolStats.priceWeth;
-  const marketCapEth = poolStats.marketCapEth;
+  const marketCapEth =
+    poolStats.marketCapEth > 0 ? poolStats.marketCapEth : (creation?.marketCapEth ?? 0);
+  const priceWeth =
+    poolStats.priceWeth > 0
+      ? poolStats.priceWeth
+      : marketCapEth > 0
+        ? marketCapEth / 1_000_000_000
+        : 0;
 
   if (!isDeployed) return <NotDeployed chainId={chainId} />;
 
@@ -105,7 +128,7 @@ export default function TokenPageClient() {
 
   // Wait for pad resolution; if it's not a pad token, also wait for the ancient list.
   const stillResolving =
-    resolved.isLoading || curve.isLoading || (!resolved.resolved && ancientLoading);
+    resolved.isLoading || (isCurve && curve.isLoading) || (!resolved.resolved && ancientLoading);
   if (isLoading || stillResolving || !data || name === undefined || symbol === undefined) {
     return (
       <div className="grid gap-6 lg:grid-cols-3">
@@ -232,6 +255,7 @@ export default function TokenPageClient() {
           marketCapEth={marketCapEth}
           onCurve={onCurve}
           progressBps={curve.progressBps}
+          volume24Usd={creation?.volume24Usd}
           variant="strip"
         />
         <TokenChart
@@ -243,6 +267,7 @@ export default function TokenPageClient() {
           isCurve={isCurve}
           bonded={resolved.bonded}
           progressBps={curve.progressBps}
+          startBlock={creation?.blockNumber}
         />
         <TokenTraders
           token={token}

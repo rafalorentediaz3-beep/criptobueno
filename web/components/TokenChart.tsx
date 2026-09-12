@@ -39,6 +39,7 @@ export function TokenChart({
   isV4 = false,
   bonded = false,
   progressBps = 0n,
+  startBlock,
 }: {
   token: Address;
   pool: Address;
@@ -53,6 +54,8 @@ export function TokenChart({
   bonded?: boolean;
   /** Curve progress toward bond, 0–10000 bps (100% once bonded). */
   progressBps?: bigint;
+  /** Launch block bounds the first V4 history scan to this token's lifetime. */
+  startBlock?: bigint;
 }) {
   const { chainId } = usePad();
   const client = usePublicClient();
@@ -75,8 +78,38 @@ export function TokenChart({
   // A bonded curve is 100% by definition, regardless of the live pool tick.
   const barBps = bonded ? 10_000n : progressBps;
 
-  const v4HistoryQuery = useV4SwapHistory(token, poolId, isV4 && !!client, REFRESH_OPTIONS[refreshLabel]);
-  const v4Points = v4HistoryQuery.data?.points ?? [];
+  const v4HistoryQuery = useV4SwapHistory(
+    token,
+    poolId,
+    isV4 && !!client,
+    REFRESH_OPTIONS[refreshLabel],
+    startBlock,
+  );
+  const [initialChartTs] = useState(() => Math.floor(Date.now() / 1000));
+  const v4Points = useMemo(() => {
+    const history = v4HistoryQuery.data?.points ?? [];
+    if (history.length > 0 || priceWeth <= 0) return history;
+    // A new pool may have no swaps yet. Draw its current on-chain launch price
+    // instead of leaving a blank chart indefinitely.
+    return [
+      {
+        timestamp: initialChartTs - 60,
+        price: priceWeth,
+        sender: ZERO_ADDRESS,
+        side: "buy" as const,
+        tokenAmount: 0,
+        wethAmount: 0,
+      },
+      {
+        timestamp: initialChartTs,
+        price: priceWeth,
+        sender: ZERO_ADDRESS,
+        side: "buy" as const,
+        tokenAmount: 0,
+        wethAmount: 0,
+      },
+    ];
+  }, [v4HistoryQuery.data?.points, priceWeth, initialChartTs]);
   const { usd: ethUsd } = useEthUsdPrice();
 
   // Bucket raw swap prices into fixed-width candles: open/close/high/low per

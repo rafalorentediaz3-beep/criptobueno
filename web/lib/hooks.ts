@@ -268,6 +268,16 @@ export interface ResolvedToken {
   isLoading: boolean;
 }
 
+export interface TokenPadHint {
+  kind: "curve" | "direct" | "v4";
+  pad: Address;
+  creator: Address;
+  pool: Address;
+  poolId?: Hex;
+  feeTier?: number;
+  lpTokenId?: bigint;
+}
+
 /**
  * Resolves which pad — curve, v4, or direct/legacy — a token launched
  * on, and its on-chain state. Reads `curves(token)` on the curve pad and
@@ -276,7 +286,7 @@ export interface ResolvedToken {
  * tokens, and graduated curve tokens all keep working. Falls back to the curve
  * pad (unresolved) while loading or if nothing matches.
  */
-export function useTokenPad(token: Address | undefined): ResolvedToken {
+export function useTokenPad(token: Address | undefined, hint?: TokenPadHint): ResolvedToken {
   const chainId = useChainId();
   const pads = useMemo(() => allPadDeployments(chainId), [chainId]);
   const curvePad = CURVE_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
@@ -298,6 +308,23 @@ export function useTokenPad(token: Address | undefined): ResolvedToken {
   });
 
   return useMemo(() => {
+    const hinted: ResolvedToken | undefined =
+      token && hint && hint.creator !== ZERO_ADDRESS
+        ? {
+            kind: hint.kind,
+            pad: hint.pad,
+            creator: hint.creator,
+            pool: hint.pool,
+            poolId: hint.poolId,
+            feeTier: hint.feeTier,
+            lpTokenId: hint.lpTokenId ?? 0n,
+            bonded: hint.kind !== "curve",
+            onCurve: hint.kind === "curve",
+            onUniswap: true,
+            resolved: true,
+            isLoading: false,
+          }
+        : undefined;
     const fallback: ResolvedToken = {
       kind: "unknown",
       pad: curvePad,
@@ -312,7 +339,7 @@ export function useTokenPad(token: Address | undefined): ResolvedToken {
       resolved: false,
       isLoading,
     };
-    if (!data) return fallback;
+    if (!data) return hinted ?? fallback;
     for (let i = 0; i < pads.length; i++) {
       const res = data[i];
       if (res?.status !== "success") continue;
@@ -373,6 +400,6 @@ export function useTokenPad(token: Address | undefined): ResolvedToken {
         }
       }
     }
-    return fallback;
-  }, [data, pads, curvePad, isLoading]);
+    return hinted ?? fallback;
+  }, [data, pads, curvePad, isLoading, token, hint]);
 }
