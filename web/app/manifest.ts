@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "PotatoPad — People's launchpad",
-    short_name: "PotatoPad",
+    name: "Robinhood Chain launchpad",
+    short_name: "Launchpad",
     description:
       "Launch a fixed-supply token straight into a permanently locked Uniswap V3 position.",
     start_url: "/",

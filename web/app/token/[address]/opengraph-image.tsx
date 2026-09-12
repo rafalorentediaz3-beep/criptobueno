@@ -29,7 +29,7 @@ const TOTAL_SUPPLY_WHOLE = 1_000_000_000;
 
 // A branded 1200x630 social card, generated on the fly per token.
 export const runtime = "nodejs";
-export const alt = "PotatoPad token";
+export const alt = "Token";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -147,9 +147,6 @@ export default async function Image({ params }: { params: Promise<{ address: str
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={POTATO_DATA_URI} width={72} height={72} alt="" />
-          <div style={{ display: "flex", fontSize: 34, fontWeight: 700, color: "#fafafa" }}>
-            PotatoPad
-          </div>
         </div>
 
         {/* Middle: token image + identity */}

@@ -30,7 +30,7 @@ export function Header() {
         <Link href="/" className="flex min-w-0 shrink-0 items-center">
           <img
             src="/header-logo.png"
-            alt="PotatoPad"
+            alt="Site logo"
             className="h-14 w-auto max-w-[240px] object-contain sm:h-16 sm:max-w-[280px]"
           />
         </Link>

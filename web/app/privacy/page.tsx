@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy · PotatoPad",
-  description: "What data PotatoPad collects and the third-party services it relies on.",
+  title: "Privacy",
+  description: "What data this site collects and the third-party services it relies on.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <div className="mx-auto max-w-2xl space-y-4 py-2 text-sm leading-relaxed text-neutral-300">
       <h1 className="text-xl font-bold tracking-tight text-neutral-100">Privacy</h1>
       <p className="text-neutral-400">
-        PotatoPad is an open-source, client-side dApp. We do not run user accounts and we do not
+        This is an open-source, client-side dApp. We do not run user accounts and we do not
         collect names, emails, or passwords. This page explains the limited data involved.
       </p>
 

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Feedback · PotatoPad",
+  title: "Feedback",
   description:
-    "Post and upvote feedback on PotatoPad. Token-holder governance, gasless voting, and a weekly reward pot for the best ideas.",
+    "Post and upvote feedback. Token-holder governance, gasless voting, and a weekly reward pot for the best ideas.",
   alternates: { canonical: "/feedback" },
 };
 

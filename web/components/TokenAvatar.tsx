@@ -1,5 +1,6 @@
 "use client";
 
+import { Heart } from "lucide-react";
 import { useMemo, useState } from "react";
 import { imageProxyCandidates } from "@/lib/format";
 import { PotatoLogo } from "@/components/PotatoLogo";
@@ -87,7 +88,7 @@ export function TokenAvatar({
   className?: string;
 }) {
   const h = hashAddress(address);
-  // Warm earth/amber band so every potato looks home-grown.
+  // Warm earth/amber band so every potato looks home-grown (non-card avatars only).
   const hue1 = 24 + (h % 26); // 24–49
   const hue2 = 24 + ((h >> 8) % 26);
   const light1 = 30 + ((h >> 16) % 14); // 30–43
@@ -98,14 +99,25 @@ export function TokenAvatar({
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden ${
-        fill ? "aspect-square w-full" : `shrink-0 rounded-xl border border-neutral-800 ${box}`
+        fill ? "aspect-square w-full bg-neutral-900" : `shrink-0 rounded-xl border border-neutral-800 ${box}`
       } ${className}`}
-      style={{
-        background: `linear-gradient(${angle}deg, hsl(${hue1} 55% ${light1}%), hsl(${hue2} 60% ${light2}%))`,
-      }}
+      style={
+        fill
+          ? undefined
+          : {
+              background: `linear-gradient(${angle}deg, hsl(${hue1} 55% ${light1}%), hsl(${hue2} 60% ${light2}%))`,
+            }
+      }
       aria-hidden
     >
-      <PotatoLogo className={`${fill ? "h-12 w-12" : icon} text-amber-200 drop-shadow-sm`} />
+      {/* Loading placeholder: a plain dark tile with a faint heart for the grid
+          cards, or the potato mark on a warm gradient for the small avatar
+          (e.g. token header) — no gradient "cookie" tile behind card images. */}
+      {fill ? (
+        <Heart className="h-10 w-10 fill-white/[0.06] text-white/[0.08]" />
+      ) : (
+        <PotatoLogo className={`${icon} text-amber-200 drop-shadow-sm`} />
+      )}
       <TokenAvatarImage
         key={`${address.toLowerCase()}|${imageURI ?? ""}`}
         imageURI={imageURI}

@@ -72,7 +72,7 @@ export const uniswapV3PoolAbi = [
   },
 ] as const;
 
-const uniswapV4PoolManagerAbi = [
+export const uniswapV4PoolManagerAbi = [
   {
     inputs: [{ internalType: "bytes32", name: "slot", type: "bytes32" }],
     name: "extsload",
@@ -85,12 +85,21 @@ const uniswapV4PoolManagerAbi = [
 const V4_POOLS_SLOT = 6n;
 const V4_LIQUIDITY_OFFSET = 3n;
 
-function v4PoolStateSlot(poolId: Hex): Hex {
+export function v4PoolStateSlot(poolId: Hex): Hex {
   return keccak256(encodePacked(["bytes32", "uint256"], [poolId, V4_POOLS_SLOT]));
+}
+
+export function v4LiquiditySlot(poolId: Hex): Hex {
+  return addSlot(v4PoolStateSlot(poolId), V4_LIQUIDITY_OFFSET);
 }
 
 function addSlot(slot: Hex, offset: bigint): Hex {
   return `0x${(BigInt(slot) + offset).toString(16).padStart(64, "0")}` as Hex;
+}
+
+/** Decode the packed v4 `Slot0` word returned by `extsload` into sqrtPriceX96. */
+export function v4SqrtPriceFromSlot(word: Hex | undefined): bigint | undefined {
+  return word ? BigInt(word) & ((1n << 160n) - 1n) : undefined;
 }
 
 /**

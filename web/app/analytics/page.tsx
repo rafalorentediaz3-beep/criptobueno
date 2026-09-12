@@ -54,7 +54,7 @@ export default function AnalyticsPage() {
     {
       label: "Tokens launched",
       value: data ? fmtNum(data.tokensLaunched) : "…",
-      hint: data ? `${fmtNum(data.activeTokens)} traded in the last 24h` : "on PotatoPad",
+      hint: data ? `${fmtNum(data.activeTokens)} traded in the last 24h` : "since launch",
       icon: Rocket,
       accent: "text-amber-400",
     },
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="text-xl font-bold tracking-tight text-neutral-100">Analytics</h1>
         <p className="mt-1 text-xs text-neutral-500">
-          Live across every token launched on PotatoPad. All-time volume + trades are summed on-chain;
+          Live across every token launched here. All-time volume + trades are summed on-chain;
           24h figures and market data are by GeckoTerminal.
         </p>
       </div>

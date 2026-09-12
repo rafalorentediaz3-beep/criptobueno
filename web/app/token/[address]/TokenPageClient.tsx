@@ -72,7 +72,6 @@ export default function TokenPageClient() {
   );
   const priceWeth = poolStats.priceWeth;
   const marketCapEth = poolStats.marketCapEth;
-  const liquidityProxy = poolStats.wethInPool;
 
   if (!isDeployed) return <NotDeployed chainId={chainId} />;
 
@@ -95,7 +94,7 @@ export default function TokenPageClient() {
       <div className="card mx-auto max-w-lg p-8 text-center">
         <h2 className="text-lg font-bold text-neutral-100">Token not found</h2>
         <p className="mt-2 text-sm text-neutral-400">
-          This address isn&apos;t a Potato Pad launch or a known Robinhood token.
+          This address isn&apos;t a launch from this site or a known Robinhood token.
         </p>
         <Link href="/" className="btn-secondary mt-5">
           Back to Discover
@@ -205,7 +204,7 @@ export default function TokenPageClient() {
               <ExternalLink className="h-3 w-3" />
             </a>
             <p className="mt-3 text-[11px] text-neutral-600">
-              Data by GeckoTerminal. This is a pre-existing token, not a PotatoPad launch.
+              Data by GeckoTerminal. This is a pre-existing token, not launched on this site.
             </p>
           </div>
         </div>
@@ -228,9 +227,9 @@ export default function TokenPageClient() {
         {/* Exchange-style stat strip: the numbers traders scan first, above the chart. */}
         <StatsCard
           token={token}
-          priceWeth={priceWeth}
+          pool={pool !== ZERO_ADDRESS ? pool : undefined}
+          chainId={chainId}
           marketCapEth={marketCapEth}
-          wethInPool={liquidityProxy}
           onCurve={onCurve}
           progressBps={curve.progressBps}
           variant="strip"

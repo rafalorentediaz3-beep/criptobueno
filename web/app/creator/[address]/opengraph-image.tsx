@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { isAddress, getAddress } from "viem";
 
 export const runtime = "edge";
-export const alt = "PotatoPad creator profile";
+export const alt = "Creator profile";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -31,7 +31,7 @@ export default async function Image({ params }: Props) {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 28, color: "#a3a3a3", letterSpacing: 2 }}>POTATOPAD</div>
+          <div style={{ fontSize: 28, color: "#a3a3a3", letterSpacing: 2 }}>ROBINHOOD CHAIN</div>
           <div style={{ fontSize: 56, fontWeight: 700 }}>Planter profile</div>
           <div
             style={{

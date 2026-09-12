@@ -100,7 +100,7 @@ export function TokenHeaderCard({
               {ancient && (
                 <span
                   className="rounded-full border border-amber-700/40 bg-amber-900/25 px-2 py-0.5 text-xs font-semibold text-amber-500/90"
-                  title="Pre-existing Robinhood token, not a PotatoPad launch"
+                  title="Pre-existing Robinhood token, not launched here"
                 >
                   Ancient
                 </span>
@@ -117,7 +117,7 @@ export function TokenHeaderCard({
                     <Link
                       href={`/creator/${getAddress(creator)}`}
                       className="text-xs text-amber-500/90 transition-colors hover:text-amber-400"
-                      title="Coins this wallet has planted on PotatoPad"
+                      title="Coins this wallet has created"
                     >
                       View planter
                     </Link>
@@ -127,18 +127,36 @@ export function TokenHeaderCard({
             </div>
             {socials.length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {socials.map((s) => (
-                  <a
-                    key={s.label}
-                    href={s.href}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300 transition-colors hover:border-amber-500/40 hover:text-amber-300"
-                  >
-                    {s.icon}
-                    {s.label}
-                  </a>
-                ))}
+                {socials.map((s) =>
+                  s.label === "X" ? (
+                    // The X link gets its own high-contrast tile (black/white,
+                    // like X's own branding) instead of the neutral pill the
+                    // other socials use, so it reads as a distinct, modern
+                    // action button rather than blending in.
+                    <a
+                      key={s.label}
+                      href={s.href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      aria-label="X (Twitter)"
+                      title="X (Twitter)"
+                      className="group inline-flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-100 text-neutral-950 shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_10px_24px_-8px_rgba(0,0,0,0.7)]"
+                    >
+                      <span className="text-[15px] font-bold leading-none">&#120143;</span>
+                    </a>
+                  ) : (
+                    <a
+                      key={s.label}
+                      href={s.href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300 transition-colors hover:border-amber-500/40 hover:text-amber-300"
+                    >
+                      {s.icon}
+                      {s.label}
+                    </a>
+                  ),
+                )}
               </div>
             )}
             {description && (

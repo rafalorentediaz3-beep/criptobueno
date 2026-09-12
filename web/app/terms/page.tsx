@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { PROOF_OF_POTATO_URL } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: "Terms & Disclaimers: Potato Pad",
+  title: "Terms & Disclaimers",
 };
 
 const sections: Array<{ title: string; body: string[] }> = [
   {
     title: "No endorsement",
     body: [
-      "Potato Pad is permissionless software: anyone can create a token here without our review or approval. The tokens listed on this site are created and promoted by third parties. We do not endorse, recommend, vet, audit, or vouch for any token, its creator, or its community. Appearing on this site means nothing beyond the fact that someone paid gas to deploy it.",
+      "This site is permissionless software: anyone can create a token here without our review or approval. The tokens listed on this site are created and promoted by third parties. We do not endorse, recommend, vet, audit, or vouch for any token, its creator, or its community. Appearing on this site means nothing beyond the fact that someone paid gas to deploy it.",
     ],
   },
   {
@@ -21,7 +21,7 @@ const sections: Array<{ title: string; body: string[] }> = [
   {
     title: "Unaudited software, no warranty",
     body: [
-      "The Potato Pad smart contracts and this interface are an open-source demonstration. They are provided “as is”, without warranty of any kind, and have not undergone a professional security audit. Bugs may exist that cause partial or total loss of funds. Use entirely at your own risk.",
+      "The smart contracts and this interface are an open-source demonstration. They are provided “as is”, without warranty of any kind, and have not undergone a professional security audit. Bugs may exist that cause partial or total loss of funds. Use entirely at your own risk.",
       "Launch liquidity positions are locked permanently and irreversibly by design. Nobody (including us) can withdraw the principal.",
     ],
   },
@@ -40,7 +40,7 @@ const sections: Array<{ title: string; body: string[] }> = [
   {
     title: "Third-party services",
     body: [
-      "Price charts may be provided by GeckoTerminal, and trading happens on Uniswap V3. Those services are independent of Potato Pad and carry their own terms.",
+      "Price charts may be provided by GeckoTerminal, and trading happens on Uniswap V3. Those services are independent of this site and carry their own terms.",
     ],
   },
 ];
@@ -68,7 +68,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-2 font-semibold text-amber-500">Attribution</h2>
           <p className="text-sm leading-relaxed text-neutral-300">
-            Potato Pad is an open-source project made by{" "}
+            This project is open-source, made by{" "}
             <a
               href={PROOF_OF_POTATO_URL}
               target="_blank"

@@ -148,7 +148,7 @@
   /* Self-limiting green ring glow on a freshly-bought token card. TokenCard
      keys it by the buy timestamp so back-to-back buys re-trigger the flash. */
   .buy-flash-ring {
-    @apply pointer-events-none absolute inset-0 rounded-xl;
+    @apply pointer-events-none absolute inset-0 rounded-[28px];
     animation: buy-flash 1.4s ease-out both;
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { memo } from "react";
 import { type Address } from "viem";
 import { formatUsd, timeAgo } from "@/lib/format";
 import { useEthUsdPrice } from "@/lib/price";
@@ -40,12 +41,16 @@ export interface TokenRow {
 }
 
 const cardShell =
-  "group card-enter relative flex flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.6)] transition-all duration-200 hover:-translate-y-0.5 hover:border-neutral-700 hover:shadow-[0_16px_30px_-16px_rgba(0,0,0,0.6)]";
+  "group card-enter relative flex flex-col overflow-hidden rounded-[28px] bg-neutral-900/40 ring-1 ring-white/[0.07] backdrop-blur-sm transition-all duration-300 ease-out hover:-translate-y-1.5 hover:bg-neutral-900/80 hover:shadow-[0_20px_60px_-25px_rgba(0,0,0,0.7)] hover:ring-white/[0.14]";
+
+/** Small rounded-pill badge used for the top-of-image tags (Ancient / Graduated / time). */
+const badge =
+  "rounded-full bg-black/55 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-neutral-200 backdrop-blur-md";
 
 /** A buy observed within this window renders the flash + "bought" chip. */
 const BUY_FLASH_WINDOW_MS = 10_000;
 
-export function TokenCard({
+function TokenCardImpl({
   row,
   /** When true, omit the planter profile link (e.g. already on that profile). */
   hideCreatorLink = false,
@@ -67,25 +72,26 @@ export function TokenCard({
     const vol = row.volume24Usd && row.volume24Usd > 0 ? formatUsd(row.volume24Usd) : "—";
     return (
       <Link href={`/token/${row.address}`} className={cardShell} data-flip-key={row.address}>
-        <div className="relative">
+        <div className="relative m-3 mb-0 overflow-hidden rounded-[20px]">
           <TokenAvatar address={row.address} symbol={row.symbol} imageURI={row.imageURI} fill />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-neutral-900 via-neutral-900/30 to-transparent" />
-          <span className="absolute left-2 top-2 rounded-full bg-neutral-700 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-white">
-            Ancient
-          </span>
+          <span className={`absolute left-2 top-2 ${badge}`}>Ancient</span>
         </div>
-        <div className="flex flex-1 flex-col justify-between gap-2 p-3">
-          <div className="space-y-0.5">
-            <h3 className="truncate text-sm font-semibold text-neutral-100">{row.name || row.symbol}</h3>
-            <div className="font-mono text-[11px] text-neutral-500">${row.symbol}</div>
+        <div className="flex flex-1 flex-col gap-3 p-4">
+          <div className="space-y-1">
+            <h3 className="truncate text-[15px] font-semibold tracking-tight text-neutral-100">
+              {row.name || row.symbol}
+            </h3>
+            <div className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+              ${row.symbol}
+            </div>
           </div>
-          <div className="space-y-1 font-mono text-xs">
-            <p className="font-bold text-neutral-100">
-              {mc} <span className="text-[9px] font-normal text-neutral-400">MC</span>
-            </p>
-            <p className="text-neutral-500">
-              {vol} <span className="text-[9px] font-normal text-neutral-400">VOL</span>
-            </p>
+          <div className="flex items-center justify-between border-t border-white/5 pt-2.5 font-mono text-[13px]">
+            <span className="text-neutral-100">
+              {mc} <span className="text-[10px] font-normal text-neutral-500">MC</span>
+            </span>
+            <span className="text-neutral-500">
+              {vol} <span className="text-[10px] font-normal text-neutral-600">VOL</span>
+            </span>
           </div>
         </div>
       </Link>
@@ -116,18 +122,17 @@ export function TokenCard({
         href={`/token/${row.address}`}
         className="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/60"
       >
-        <div className="relative">
+        <div className="relative m-3 mb-0 overflow-hidden rounded-[20px]">
           <TokenAvatar address={row.address} symbol={row.symbol} imageURI={row.imageURI} fill />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-neutral-900 via-neutral-900/30 to-transparent" />
           {/* Only migration earns a badge; a bonding curve is already told by its
               progress bar, and "Live" said nothing at all. */}
           {migrated && (
-            <span className="absolute left-2 top-2 rounded-full bg-neutral-700 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-white">
+            <span className={`absolute left-2 top-2 ${badge} bg-amber-400/90 text-neutral-900`}>
               Graduated
             </span>
           )}
           {row.createdAt !== undefined && row.createdAt > 0 && (
-            <span className="absolute right-2 top-2 rounded-full bg-neutral-900/90 px-2 py-1 font-mono text-[9px] text-neutral-400 shadow-sm backdrop-blur-md">
+            <span className={`absolute right-2 top-2 ${badge} normal-case tracking-normal`}>
               {timeAgo(row.createdAt)}
             </span>
           )}
@@ -137,34 +142,73 @@ export function TokenCard({
             </span>
           )}
         </div>
-        <div className="flex flex-1 flex-col justify-between gap-2.5 p-3 pb-1">
-          <div className="space-y-0.5">
-            <h3 className="truncate text-sm font-semibold text-neutral-100">{row.name}</h3>
-            <div className="font-mono text-[11px] text-neutral-500">${row.symbol}</div>
-          </div>
+        <div className="flex flex-1 flex-col gap-3 p-4 pb-3.5">
           <div className="space-y-1">
-            <p className="font-mono text-sm font-bold text-neutral-100">
-              {mc} <span className="text-[10px] font-normal text-neutral-400">MC</span>
-            </p>
-            {/* Pre-bond curve token: show the bonding progress; otherwise the address. */}
-            {onCurve ? (
-              <div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,#ffd84a_0%,#f2b90f_60%,#d88a05_100%)]"
-                    style={{ width: `${Math.max(2, progress)}%` }}
-                  />
-                </div>
-                <div className="mt-1 flex justify-between font-mono text-[10px] tabular-nums text-neutral-500">
-                  <span>Growing</span>
-                  <span>{progress.toFixed(0)}% to bond</span>
-                  <span>🎓 Bond</span>
-                </div>
+            <h3 className="truncate text-[15px] font-semibold tracking-tight text-neutral-100">
+              {row.name}
+            </h3>
+            <div className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+              ${row.symbol}
+            </div>
+          </div>
+          <div className="mt-auto flex flex-col gap-2 border-t border-white/5 pt-2.5">
+            <div className="flex items-center justify-between font-mono text-[13px]">
+              <span className="text-neutral-100">
+                {mc} <span className="text-[10px] font-normal text-neutral-500">MC</span>
+              </span>
+              {onCurve && (
+                <span className="tabular-nums text-neutral-500">{progress.toFixed(0)}%</span>
+              )}
+            </div>
+            {/* Pre-bond curve token: show the bonding progress as a slim, minimal line. */}
+            {onCurve && (
+              <div className="h-[4px] w-full overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-amber-400 transition-[width] duration-500"
+                  style={{ width: `${Math.max(2, progress)}%` }}
+                />
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </Link>
     </article>
   );
 }
+
+/**
+ * Discover renders dozens of these per tab/sort switch and per periodic price
+ * refetch (pool reads every 60s, buy-watch every 10s). Most of those ticks
+ * leave any given card's own fields unchanged (its price/volume/etc. didn't
+ * move), so a field-level comparison — instead of the default shallow prop
+ * check — skips re-rendering (and re-measuring, for the FLIP grid animation)
+ * cards whose visible data is identical, which is what made sort/tab clicks
+ * and typing in search feel laggy on a full grid.
+ */
+function rowsEqual(a: TokenRow, b: TokenRow): boolean {
+  return (
+    a.address === b.address &&
+    a.name === b.name &&
+    a.symbol === b.symbol &&
+    a.creator === b.creator &&
+    a.creatorName === b.creatorName &&
+    a.pool === b.pool &&
+    a.priceWeth === b.priceWeth &&
+    a.marketCapEth === b.marketCapEth &&
+    a.createdAt === b.createdAt &&
+    a.imageURI === b.imageURI &&
+    a.ancient === b.ancient &&
+    a.marketCapUsd === b.marketCapUsd &&
+    a.volume24Usd === b.volume24Usd &&
+    a.curve === b.curve &&
+    a.bonded === b.bonded &&
+    a.curveProgressBps === b.curveProgressBps &&
+    a.lastBuyAt === b.lastBuyAt
+  );
+}
+
+export const TokenCard = memo(
+  TokenCardImpl,
+  (prev, next) =>
+    prev.hideCreatorLink === next.hideCreatorLink && rowsEqual(prev.row, next.row),
+);

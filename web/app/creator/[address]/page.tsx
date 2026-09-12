@@ -8,16 +8,16 @@ type Props = { params: Promise<{ address: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { address: raw } = await params;
   if (!isAddress(raw)) {
-    return { title: "Creator · PotatoPad" };
+    return { title: "Creator" };
   }
   const address = getAddress(raw);
   const label = shortAddress(address);
   return {
-    title: `Creator ${label} · PotatoPad`,
-    description: `Coins planted on PotatoPad by ${label}. Existence metrics from on-chain TokenCreated events — not volume or holdings.`,
+    title: `Creator ${label}`,
+    description: `Coins created by ${label}. Existence metrics from on-chain TokenCreated events — not volume or holdings.`,
     openGraph: {
-      title: `Creator ${label} · PotatoPad`,
-      description: `PotatoPad planter profile for ${label}.`,
+      title: `Creator ${label}`,
+      description: `Creator profile for ${label}.`,
     },
   };
 }

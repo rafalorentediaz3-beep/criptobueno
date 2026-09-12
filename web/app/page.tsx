@@ -1,12 +1,12 @@
 "use client";
 
-import { Hourglass, Search, Sprout } from "lucide-react";
+import { Heart, Hourglass, Search, Sprout } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 import { useReadContracts } from "wagmi";
-import { potatoCurvePadAbi } from "@/lib/abi";
-import { WETH_ADDRESSES, ZERO_ADDRESS, isMigrated } from "@/lib/config";
+import { potatoCurvePadAbi, potatoV4PadAbi } from "@/lib/abi";
+import { V4_POOL_MANAGER_ADDRESSES, WETH_ADDRESSES, ZERO_ADDRESS, isMigrated } from "@/lib/config";
 import { useAncientTokens } from "@/lib/ancient";
 import { useRecentBuys } from "@/lib/buys";
 import { useLaunchActivity } from "@/lib/events";
@@ -15,6 +15,9 @@ import {
   priceWethPerToken,
   tokenIsToken0,
   uniswapV3PoolAbi,
+  uniswapV4PoolManagerAbi,
+  v4PoolStateSlot,
+  v4SqrtPriceFromSlot,
   TOTAL_SUPPLY_WHOLE,
 } from "@/lib/pool";
 import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
@@ -31,7 +34,7 @@ type TabId = "growing" | "ancient";
 type SortId = "recent" | "new" | "old" | "mcap";
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "growing", label: "Growing" },
+  { id: "growing", label: "Hot coins" },
   { id: "ancient", label: "Ancients" },
 ];
 const SORTS: { id: SortId; label: string }[] = [
@@ -44,8 +47,8 @@ type Slot0 = readonly [bigint, number, number, number, number, number, boolean];
 
 function CardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900">
-      <div className="skeleton aspect-square w-full rounded-none" />
+    <div className="overflow-hidden rounded-[28px] bg-neutral-900/40 ring-1 ring-white/[0.07]">
+      <div className="skeleton m-3 mb-0 aspect-square w-[calc(100%-1.5rem)] rounded-[20px]" />
       <div className="space-y-2 p-4">
         <div className="skeleton h-3 w-2/3" />
         <div className="skeleton h-3 w-1/2" />
@@ -89,6 +92,62 @@ export default function DiscoverPage() {
     contracts: curveContracts as never[],
     allowFailure: true,
     query: { enabled: isDeployed && hasCurve },
+  });
+
+  // Direct-to-v4 launches have no pool contract address at all — v4 pools are
+  // singleton-managed and identified by a bytes32 PoolId. Resolve each v4
+  // creation's PoolId from the pad THAT LAUNCHED IT (c.pad) first (pass 1b) —
+  // several superseded v4 pads remain live read-only (see legacyPads in
+  // config.ts), so this can't use a single "current v4 pad" address — then
+  // read that pool's packed Slot0 word straight off the PoolManager via
+  // `extsload` (pass 2b). Same index-alignment trick as the curve reads: call
+  // for every creation (harmless no-op for non-v4 kinds under allowFailure) so
+  // array indices stay aligned to `creations` without a second bookkeeping pass.
+  const v4Manager = V4_POOL_MANAGER_ADDRESSES[ANALYTICS_CHAIN_ID] ?? ZERO_ADDRESS;
+  const hasV4 = v4Manager !== ZERO_ADDRESS && creations.some((c) => c.kind === "v4");
+  const v4TokenContracts = useMemo(
+    () =>
+      creations.map((c) => ({
+        address: c.pad,
+        abi: potatoV4PadAbi,
+        functionName: "v4Tokens" as const,
+        args: [c.token],
+      })),
+    [creations],
+  );
+  const { data: v4TokenReads } = useReadContracts({
+    contracts: v4TokenContracts as never[],
+    allowFailure: true,
+    query: { enabled: isDeployed && hasV4 },
+  });
+
+  // v4Tokens() => (creator, poolId, lpTokenId, feeTier); poolId undefined when
+  // the creation isn't (yet) resolved as a v4 token — that read is skipped below.
+  const ZERO_POOL_ID = `0x${"0".repeat(64)}` as Hex;
+  const v4PoolIds = useMemo<(Hex | undefined)[]>(
+    () =>
+      creations.map((c, i) => {
+        if (c.kind !== "v4") return undefined;
+        const info = v4TokenReads?.[i]?.result as readonly [Address, Hex, bigint, number] | undefined;
+        return info?.[0] && info[0] !== ZERO_ADDRESS ? info[1] : undefined;
+      }),
+    [creations, v4TokenReads],
+  );
+  const v4StateContracts = useMemo(
+    () =>
+      v4PoolIds.map((poolId) => ({
+        address: v4Manager,
+        abi: uniswapV4PoolManagerAbi,
+        functionName: "extsload" as const,
+        args: [v4PoolStateSlot(poolId ?? ZERO_POOL_ID)],
+        chainId: ANALYTICS_CHAIN_ID,
+      })),
+    [v4PoolIds, v4Manager],
+  );
+  const { data: v4StateReads } = useReadContracts({
+    contracts: v4StateContracts as never[],
+    allowFailure: true,
+    query: { enabled: hasV4 && v4PoolIds.some((id) => !!id) },
   });
 
   // The Uniswap pool to price each token from. Curve tokens (single-sided-v3) have
@@ -162,11 +221,19 @@ export default function DiscoverPage() {
         const bonded = isCurveTok ? isMigrated(c.token, cv?.[3] ?? false) : true;
         const onCurve = isCurveTok && !bonded;
 
-        // Curve tokens have a live pool from block one, so every token prices
-        // from its pool's slot0 — continuous across migration.
-        const slot0 = poolReads?.[i]?.result as Slot0 | undefined;
-        const sqrtPriceX96 = slot0?.[0];
-        // Failed / missing slot0 → null (never coerce unknown price to 0 ETH).
+        // Curve and direct tokens have a live Uniswap V3 pool from block one,
+        // so they price off its slot0. v4 launches have no pool contract at
+        // all — their price comes from the PoolManager's packed Slot0 word
+        // (read via extsload against the resolved PoolId) instead.
+        let sqrtPriceX96: bigint | undefined;
+        if (c.kind === "v4") {
+          const stateWord = v4StateReads?.[i]?.result as Hex | undefined;
+          sqrtPriceX96 = v4SqrtPriceFromSlot(stateWord);
+        } else {
+          const slot0 = poolReads?.[i]?.result as Slot0 | undefined;
+          sqrtPriceX96 = slot0?.[0];
+        }
+        // Failed / missing price → null (never coerce unknown price to 0 ETH).
         let priceWeth: number | null = null;
         if (sqrtPriceX96 !== undefined && sqrtPriceX96 > 0n) {
           const p = priceWethPerToken(sqrtPriceX96, tokenIsToken0(c.token, RH_WETH));
@@ -191,7 +258,7 @@ export default function DiscoverPage() {
           curveProgressBps: onCurve ? (curveProg ?? 0n) : undefined,
         };
       }),
-    [creations, curveReads, poolReads, effectivePools, creatorProfiles, lastBuyAt],
+    [creations, curveReads, poolReads, v4StateReads, effectivePools, creatorProfiles, lastBuyAt],
   );
 
   const ancientRows = useMemo<TokenRow[]>(
@@ -334,13 +401,23 @@ export default function DiscoverPage() {
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
-              {isAncientTab ? "Ancient Heritage" : "Growing"}
-              <span
-                suppressHydrationWarning
-                className="ml-2 inline-flex rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_10px_-6px_rgba(180,108,0,0.9)]"
-              >
-                {activeRows.length}
-              </span>
+              {isAncientTab ? "Ancient Heritage" : "Hot coins"}
+              {isAncientTab ? (
+                <span
+                  suppressHydrationWarning
+                  className="ml-2 inline-flex rounded-full bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_10px_-6px_rgba(180,108,0,0.9)]"
+                >
+                  {activeRows.length}
+                </span>
+              ) : (
+                <span
+                  suppressHydrationWarning
+                  className="ml-2 inline-flex items-center gap-1 rounded-full bg-[linear-gradient(180deg,#ff8fc7_0%,#ff4f9e_48%,#e6197a_100%)] px-2.5 py-1 align-middle text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,220,235,0.7),0_4px_10px_-6px_rgba(200,10,110,0.9)]"
+                >
+                  <Heart className="h-3 w-3 fill-white" aria-hidden />
+                  {activeRows.length}
+                </span>
+              )}
             </h1>
             {isAncientTab && (
               <p className="mt-2 text-sm text-neutral-500">Verified legacy runners from Robinhood.</p>
@@ -351,7 +428,7 @@ export default function DiscoverPage() {
           </Link>
         </div>
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 10 }).map((_, i) => (
               <CardSkeleton key={i} />
             ))}
@@ -391,7 +468,7 @@ export default function DiscoverPage() {
             </p>
           </div>
         ) : (
-          <div ref={gridRef} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div ref={gridRef} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {visible.map((row) => (
               <TokenCard key={row.address} row={row} />
             ))}

@@ -15,7 +15,7 @@ export function NotDeployed({ chainId }: { chainId: number }) {
     <div className="card mx-auto max-w-lg p-8 text-center">
       <Moon className="mx-auto h-10 w-10 text-neutral-500" aria-hidden />
       <h2 className="mt-4 text-lg font-bold text-neutral-100">
-        Potato Pad isn&apos;t deployed on {chainName(chainId)}
+        This site isn&apos;t deployed on {chainName(chainId)}
       </h2>
       <p className="mt-2 text-sm text-neutral-400">
         No contract address is configured for this network. Set{" "}

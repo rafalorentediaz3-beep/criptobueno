@@ -195,7 +195,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `Creator ${shortAddress(address)} · PotatoPad`,
+          title: `Creator ${shortAddress(address)}`,
           url,
         });
       } else {
@@ -287,7 +287,7 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
             <Sprout className="mx-auto h-10 w-10 text-green-500/70" aria-hidden />
             <h2 className="mt-4 text-lg font-bold text-neutral-100">No coins planted yet</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              {shortAddress(address)} hasn&apos;t planted a coin on PotatoPad (Robinhood)
+              {shortAddress(address)} hasn&apos;t created a coin on Robinhood Chain
               yet. Anything they launch will show up here.
             </p>
             <Link href="/" className="btn-secondary mt-6 inline-flex">

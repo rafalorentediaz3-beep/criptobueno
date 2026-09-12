@@ -3,25 +3,26 @@
 import { Activity } from "lucide-react";
 import type { Address } from "viem";
 import { useTokenHolders } from "@/lib/events";
-import { bpsToPercent, formatEth, formatFloatPrice, formatUsd, formatUsdPrice } from "@/lib/format";
+import { bpsToPercent, formatUsd } from "@/lib/format";
 import { useEthUsdPrice } from "@/lib/price";
+import { usePoolVolume24h } from "@/lib/volume";
 
 export function StatsCard({
   token,
-  priceWeth,
+  pool,
+  chainId,
   marketCapEth,
-  wethInPool,
   onCurve = false,
   progressBps = 0n,
   variant = "card",
 }: {
   token: Address;
-  /** WETH per whole token (float) — from the pool, or the curve when onCurve */
-  priceWeth: number;
+  /** Live Uniswap pool address, used to look up 24h volume. */
+  pool?: Address;
+  /** Chain id, used to resolve the GeckoTerminal network for the volume lookup. */
+  chainId: number;
   /** fully-diluted valuation in ETH (float) */
   marketCapEth: number;
-  /** WETH held by the pool, or ETH collected on the curve when onCurve */
-  wethInPool: bigint | undefined;
   /** True while the token is in the pre-migration bonding-curve phase. */
   onCurve?: boolean;
   /** Curve progress toward the fill/migration price, 0–10000 bps (only when onCurve). */
@@ -31,23 +32,11 @@ export function StatsCard({
 }) {
   const { holders, unavailable: holdersUnavailable } = useTokenHolders(token);
   const { usd: ethUsd } = useEthUsdPrice();
+  const volume24Usd = usePoolVolume24h(chainId, pool);
 
   const marketCapUsd = ethUsd !== null ? marketCapEth * ethUsd : null;
-  const priceUsd = ethUsd !== null && priceWeth > 0 ? priceWeth * ethUsd : null;
 
   const rows: Array<{ label: string; value: string; sub?: string }> = [
-    {
-      label: "Price",
-      // USD headline; fall back to the ETH price if the feed is down.
-      value:
-        priceWeth <= 0
-          ? "…"
-          : priceUsd !== null
-            ? formatUsdPrice(priceUsd)
-            : `${formatFloatPrice(priceWeth)} ETH`,
-      sub:
-        priceUsd !== null && priceWeth > 0 ? `${formatFloatPrice(priceWeth)} ETH` : undefined,
-    },
     {
       label: "Market Cap",
       // USD headline; fall back to the ETH-denominated FDV if the feed is down.
@@ -63,18 +52,9 @@ export function StatsCard({
           : undefined,
     },
     {
-      label: onCurve ? "Collected" : "Liquidity",
-      // USD headline (matches Price / Market cap), raw WETH as the subline.
-      value:
-        wethInPool === undefined
-          ? "…"
-          : ethUsd !== null
-            ? formatUsd(Number(wethInPool) / 1e18 * ethUsd)
-            : `${formatEth(wethInPool)} ${onCurve ? "ETH" : "WETH"}`,
-      sub:
-        wethInPool !== undefined && ethUsd !== null
-          ? `${formatEth(wethInPool)} ${onCurve ? "ETH" : "WETH"}`
-          : undefined,
+      label: "Volume",
+      value: volume24Usd !== null && volume24Usd > 0 ? formatUsd(volume24Usd) : "—",
+      sub: "24h",
     },
     {
       label: "Holders",
@@ -85,7 +65,7 @@ export function StatsCard({
   // Horizontal strip (exchange-style): one row of stats above the chart.
   if (variant === "strip") {
     return (
-      <div className="card grid grid-cols-2 sm:grid-cols-4 sm:divide-x sm:divide-neutral-800/70">
+      <div className="card grid grid-cols-3 sm:divide-x sm:divide-neutral-800/70">
         {rows.map((row) => (
           <div key={row.label} className="px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">

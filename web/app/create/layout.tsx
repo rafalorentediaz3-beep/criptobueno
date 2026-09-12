@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Launch a token · PotatoPad",
+  title: "Launch a token",
   description:
     "Launch a fixed-supply token straight into a permanently locked Uniswap V3 position — live and tradable from the first block.",
   alternates: { canonical: "/create" },

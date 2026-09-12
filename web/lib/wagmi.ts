@@ -11,10 +11,15 @@ import { robinhoodServerTransport } from "./serverRpc";
 // Robinhood reads go through our same-origin /api/rpc proxy in the browser, so
 // the Alchemy key never ships to the client and can't be scraped. On the server
 // (SSR) we hit the Alchemy endpoint directly from the server-only env var.
+// `batch: true` lets viem coalesce concurrent single eth_call/eth_getLogs/etc.
+// requests (e.g. curve reads, v4 reads, and pool reads all firing on the same
+// tick) into ONE JSON-RPC array POST instead of several separate round trips —
+// the proxy already accepts and de-dupes/caches batched array bodies (see
+// app/api/rpc/route.ts), so this is a pure latency win with no server change.
 const robinhoodTransport =
   typeof window === "undefined"
     ? robinhoodServerTransport()
-    : http(`${window.location.origin}/api/rpc`);
+    : http(`${window.location.origin}/api/rpc`, { batch: true });
 
 // Chains with a deployed pad (curve OR direct) first: wagmi treats the first
 // chain as the default when no wallet is connected, so visitors land on a
