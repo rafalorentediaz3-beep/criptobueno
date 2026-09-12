@@ -15,6 +15,8 @@ export function StatsCard({
   onCurve = false,
   progressBps = 0n,
   volume24Usd: initialVolume24Usd,
+  isV4 = false,
+  startBlock,
   variant = "card",
 }: {
   token: Address;
@@ -30,10 +32,19 @@ export function StatsCard({
   progressBps?: bigint;
   /** Feed snapshot shown immediately while the per-pool request refreshes. */
   volume24Usd?: number;
+  isV4?: boolean;
+  startBlock?: bigint;
   /** "card": sidebar box with heading. "strip": horizontal row for the page top. */
   variant?: "card" | "strip";
 }) {
-  const { holders, unavailable: holdersUnavailable } = useTokenHolders(token);
+  // Disabled observer: reads the shared cache after the user explicitly loads
+  // the Holders tab, without starting the expensive history scan itself.
+  const { holders, unavailable: holdersUnavailable } = useTokenHolders(
+    token,
+    isV4 ? "v4" : undefined,
+    false,
+    startBlock,
+  );
   const { usd: ethUsd } = useEthUsdPrice();
   const liveVolume24Usd = usePoolVolume24h(chainId, pool);
   const volume24Usd = liveVolume24Usd ?? initialVolume24Usd ?? 0;
@@ -62,7 +73,7 @@ export function StatsCard({
     },
     {
       label: "Holders",
-      value: holdersUnavailable ? "n/a" : holders.length.toString(),
+      value: holdersUnavailable ? "n/a" : holders.length > 0 ? holders.length.toString() : "—",
     },
   ];
 

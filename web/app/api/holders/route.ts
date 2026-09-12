@@ -197,9 +197,10 @@ async function refresh(key: string, token: Address, startBlock: bigint): Promise
   })();
 
   scanning.set(key, p);
-  void p.finally(() => {
+  const clearInflight = () => {
     if (scanning.get(key) === p) scanning.delete(key);
-  });
+  };
+  void p.then(clearInflight, clearInflight);
   return p;
 }
 
@@ -211,7 +212,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid or missing token address" }, { status: 400 });
   }
   const key = token.toLowerCase();
-  const startBlock = startBlockForKind(kind);
+  const kindStartBlock = startBlockForKind(kind);
+  const requestedStartRaw = url.searchParams.get("fromBlock");
+  const requestedStart =
+    requestedStartRaw && /^\d+$/.test(requestedStartRaw)
+      ? BigInt(requestedStartRaw)
+      : undefined;
+  // Never allow a caller to widen the scan earlier than the launcher's safe
+  // lower bound. A known creation block narrows first-load work dramatically.
+  const startBlock =
+    requestedStart !== undefined && requestedStart > kindStartBlock
+      ? requestedStart
+      : kindStartBlock;
   const now = Date.now();
 
   const st = state.get(key);

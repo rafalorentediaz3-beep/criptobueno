@@ -38,7 +38,13 @@ export function TokenTraders({
 }) {
   const client = usePublicClient();
   const [tab, setTab] = useState<"trades" | "holders">(isV4 ? "trades" : "holders");
-  const { holders, total, unavailable, isLoading } = useTokenHolders(token, isV4 ? "v4" : undefined);
+  const [holdersRequested, setHoldersRequested] = useState(false);
+  const { holders, total, unavailable, isLoading } = useTokenHolders(
+    token,
+    isV4 ? "v4" : undefined,
+    tab === "holders" && holdersRequested,
+    startBlock,
+  );
   const topHolders = holders.slice(0, 10);
   const { usd: ethUsd } = useEthUsdPrice();
   const tradesQuery = useV4SwapHistory(
@@ -73,7 +79,10 @@ export function TokenTraders({
           )}
           <button
             type="button"
-            onClick={() => setTab("holders")}
+            onClick={() => {
+              setTab("holders");
+              setHoldersRequested(true);
+            }}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${tab === "holders" ? "bg-amber-500 text-black" : "text-neutral-400 hover:text-neutral-200"}`}
           >
             Holders
@@ -124,6 +133,17 @@ export function TokenTraders({
             })}
           </ul>
         )
+      ) : !holdersRequested ? (
+        <div className="mt-6 flex justify-center pb-2">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setHoldersRequested(true)}
+          >
+            <Users className="h-4 w-4" />
+            Load holders
+          </button>
+        </div>
       ) : isLoading ? (
         <div className="mt-4 space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (

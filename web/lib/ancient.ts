@@ -47,14 +47,15 @@ interface AncientResult {
   unavailable: boolean;
 }
 
-export function useAncientTokens() {
+export function useAncientTokens({ enabled = true }: { enabled?: boolean } = {}) {
   const query = useQuery<AncientResult>({
     queryKey: ["ancient-tokens"],
+    enabled,
     staleTime: 120_000,
     gcTime: 30 * 60_000,
     // Poll to auto-recover while the feed is soft-degraded, so a transient blip
     // doesn't strand the gallery on an empty view until the next focus/refresh.
-    refetchInterval: (q) => (q.state.data?.unavailable ? 5000 : false),
+    refetchInterval: (q) => (enabled && q.state.data?.unavailable ? 5000 : false),
     queryFn: async () => {
       try {
         const res = await fetch("/api/ancient");

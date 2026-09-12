@@ -10,5 +10,5 @@ export const ANALYTICS_CHAIN_ID = robinhoodChain.id; // 4663
  */
 export const robinhoodPublicClient = createPublicClient({
   chain: robinhoodChain,
-  transport: http("https://rpc.mainnet.chain.robinhood.com", { timeout: 12_000 }),
+  transport: http("https://rpc.mainnet.chain.robinhood.com", { timeout: 2_500 }),
 });

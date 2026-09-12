@@ -310,7 +310,10 @@ export function useTokenPad(token: Address | undefined, hint?: TokenPadHint): Re
           ? { address: p.address, abi: potatoV4PadAbi, functionName: "v4Tokens", args: [token ?? ZERO_ADDRESS] }
           : { address: p.address, abi: potatoPadAbi, functionName: "tokens", args: [token ?? ZERO_ADDRESS] },
     ),
-    query: { enabled: !!token && pads.length > 0 && !completeHint },
+    query: {
+      enabled: !!token && pads.length > 0 && !completeHint,
+      staleTime: 5 * 60_000,
+    },
   });
 
   return useMemo(() => {

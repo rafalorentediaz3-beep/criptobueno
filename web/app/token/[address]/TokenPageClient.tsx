@@ -1,10 +1,10 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAddress, isAddress } from "viem";
-import { useReadContracts } from "wagmi";
+import { useReadContract } from "wagmi";
 import { potatoTokenAbi } from "@/lib/abi";
 import { ZERO_ADDRESS } from "@/lib/config";
 import { useAncientTokens } from "@/lib/ancient";
@@ -33,7 +33,10 @@ export default function TokenPageClient() {
 
   // Start from the server-resolved launch snapshot, then verify it on-chain in
   // the background. Navigation no longer waits for every historical pad read.
-  const { creationByToken } = useLaunchActivity({ live: false });
+  // Reuse Discover's in-memory/local snapshot, but never start the expensive
+  // all-token history scan from a detail page. A cold direct URL resolves only
+  // this token through the batched contract reads below.
+  const { creationByToken } = useLaunchActivity({ live: false, fetchFeed: false });
   const creation = token ? creationByToken.get(token.toLowerCase()) : undefined;
   const resolved = useTokenPad(
     token,
@@ -54,7 +57,9 @@ export default function TokenPageClient() {
   // Do not issue curve-pad reads for V4/direct tokens.
   const curve = useCurveStats(isCurve ? token : undefined);
   // If no pad claims it, it may be a pre-existing "ancient" Robinhood token.
-  const { byAddress: ancientByAddress, isLoading: ancientLoading } = useAncientTokens();
+  const { byAddress: ancientByAddress, isLoading: ancientLoading } = useAncientTokens({
+    enabled: !creation && !resolved.isLoading && !resolved.resolved,
+  });
   const ancient = token ? ancientByAddress.get(token.toLowerCase()) : undefined;
 
   const onCurve = isCurve && !resolved.bonded; // pre-bond curve phase (still trades on Uniswap)
@@ -65,19 +70,37 @@ export default function TokenPageClient() {
   // creation; ancient tokens use their pre-existing trade pool.
   const pool = isAncient && ancient ? ancient.tradePool : resolved.pool;
 
-  // Queries are disabled unless the address is valid; ZERO_ADDRESS is a typed placeholder.
+  // The launch/ancient feeds already carry these labels. Only hit the token
+  // contract when a direct URL arrives before either feed has identified it.
   const queryToken = token ?? ZERO_ADDRESS;
-  const { data, isLoading, isError } = useReadContracts({
-    allowFailure: false,
-    contracts: [
-      { address: queryToken, abi: potatoTokenAbi, functionName: "name" },
-      { address: queryToken, abi: potatoTokenAbi, functionName: "symbol" },
-    ],
-    query: { enabled: isDeployed && !!token },
+  const knownName = creation?.name?.trim() || ancient?.name?.trim();
+  const knownSymbol = creation?.symbol?.trim() || ancient?.symbol?.trim();
+  const needsTokenMetadata = !knownName || !knownSymbol;
+  const nameRead = useReadContract({
+    address: queryToken,
+    abi: potatoTokenAbi,
+    functionName: "name",
+    query: {
+      enabled: isDeployed && !!token && needsTokenMetadata,
+      retry: 2,
+      staleTime: 5 * 60_000,
+    },
+  });
+  const symbolRead = useReadContract({
+    address: queryToken,
+    abi: potatoTokenAbi,
+    functionName: "symbol",
+    query: {
+      enabled: isDeployed && !!token && needsTokenMetadata,
+      retry: 2,
+      staleTime: 5 * 60_000,
+    },
   });
 
-  const name = data?.[0] as string | undefined;
-  const symbol = data?.[1] as string | undefined;
+  const readName = nameRead.data as string | undefined;
+  const readSymbol = symbolRead.data as string | undefined;
+  const name = knownName || readName?.trim();
+  const symbol = knownSymbol || readSymbol?.trim();
 
   // Price / market cap / liquidity from the Uniswap pool. Curve tokens have a
   // live pool from block one, so this is continuous across migration; {curve}
@@ -112,16 +135,48 @@ export default function TokenPageClient() {
     );
   }
 
-  if (isError) {
+  // A provider timeout does not mean the contract is missing. Keep this state
+  // explicitly retryable instead of intermittently labelling valid tokens as
+  // "not found".
+  if (!name || !symbol) {
+    const metadataLoading = nameRead.isLoading || symbolRead.isLoading;
+    const metadataSettled =
+      !metadataLoading &&
+      ((nameRead.isError || nameRead.data !== undefined) &&
+        (symbolRead.isError || symbolRead.data !== undefined));
+    if (!metadataSettled) {
+      return (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <div className="card p-6">
+              <LineSkeleton className="h-7 w-56" />
+              <LineSkeleton className="mt-3 h-4 w-72" />
+            </div>
+            <div className="card h-72 p-6">
+              <LineSkeleton className="h-5 w-24" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
-        <h2 className="text-lg font-bold text-neutral-100">Token not found</h2>
+        <h2 className="text-lg font-bold text-neutral-100">Token data unavailable</h2>
         <p className="mt-2 text-sm text-neutral-400">
-          This address isn&apos;t a launch from this site or a known Robinhood token.
+          The network did not return this token&apos;s details. Try the request again.
         </p>
-        <Link href="/" className="btn-secondary mt-5">
-          Back to Discover
-        </Link>
+        <button
+          type="button"
+          className="btn-secondary mt-5"
+          onClick={() => {
+            void nameRead.refetch();
+            void symbolRead.refetch();
+          }}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Retry
+        </button>
       </div>
     );
   }
@@ -129,7 +184,7 @@ export default function TokenPageClient() {
   // Wait for pad resolution; if it's not a pad token, also wait for the ancient list.
   const stillResolving =
     resolved.isLoading || (isCurve && curve.isLoading) || (!resolved.resolved && ancientLoading);
-  if (isLoading || stillResolving || !data || name === undefined || symbol === undefined) {
+  if (stillResolving) {
     return (
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -257,6 +312,8 @@ export default function TokenPageClient() {
           onCurve={onCurve}
           progressBps={curve.progressBps}
           volume24Usd={creation?.volume24Usd}
+          isV4={isV4}
+          startBlock={creation?.blockNumber}
           variant="strip"
         />
         <TokenChart

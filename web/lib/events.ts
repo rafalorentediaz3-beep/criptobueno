@@ -138,7 +138,10 @@ const EMPTY_LAUNCH: LaunchActivity = {
  * PotatoPad launch feed — always Robinhood (4663) server scan, independent of
  * the connected wallet chain. Discover, ticker, and creator profiles share this.
  */
-export function useLaunchActivity({ live = true }: { live?: boolean } = {}) {
+export function useLaunchActivity({
+  live = true,
+  fetchFeed = true,
+}: { live?: boolean; fetchFeed?: boolean } = {}) {
   // Pad addresses come from the CONNECTED chain purely to drive the live event
   // watches below; the feed itself stays pinned to Robinhood (see docstring) so
   // profiles and the ticker work no matter what chain the wallet is on.
@@ -155,15 +158,15 @@ export function useLaunchActivity({ live = true }: { live?: boolean } = {}) {
 
   const query = useQuery<LaunchActivity>({
     queryKey,
-    enabled: true,
+    enabled: fetchFeed,
     staleTime: 30_000,
     gcTime: 24 * 60 * 60 * 1000,
     // Keep launch history live even when the wallet is idle. Contract watches
     // provide fast updates; polling is the fallback after reconnects or missed
     // websocket notifications from the public RPC.
     refetchInterval: (q) =>
-      q.state.data?.state === "unavailable" ? 10_000 : live ? 60_000 : false,
-    refetchOnWindowFocus: live,
+      !fetchFeed ? false : q.state.data?.state === "unavailable" ? 10_000 : live ? 60_000 : false,
+    refetchOnWindowFocus: live && fetchFeed,
     // Prefer a warm local snapshot over a blank unavailable frame while revalidating.
     placeholderData: () => {
       const cached = readLaunchCache(cacheKey);
@@ -344,23 +347,29 @@ const EMPTY_HOLDERS: HoldersData = { holders: [], total: 0n, unavailable: false 
  * Balances per address, sorted descending. The Transfer-log scan runs
  * server-side (cached) at /api/holders.
  */
-export function useTokenHolders(token: Address | undefined, kind?: "curve" | "direct" | "v4") {
+export function useTokenHolders(
+  token: Address | undefined,
+  kind?: "curve" | "direct" | "v4",
+  enabled = true,
+  startBlock?: bigint,
+) {
   const { chainId, isDeployed } = usePad();
   const queryKey = useMemo(
-    () => ["token-holders", chainId, token ?? "none", kind ?? "any"],
-    [chainId, token, kind],
+    () => ["token-holders", chainId, token ?? "none", kind ?? "any", startBlock?.toString() ?? "pad"],
+    [chainId, token, kind, startBlock],
   );
 
   const query = useQuery<HoldersData>({
     queryKey,
-    enabled: isDeployed && !!token,
+    enabled: enabled && isDeployed && !!token,
     staleTime: 30_000,
     refetchInterval: 60_000,
     queryFn: async () => {
       if (!token) return EMPTY_HOLDERS;
       try {
         const kindParam = kind ? `&kind=${kind}` : "";
-        const res = await fetch(`/api/holders?token=${token}${kindParam}`);
+        const blockParam = startBlock !== undefined ? `&fromBlock=${startBlock}` : "";
+        const res = await fetch(`/api/holders?token=${token}${kindParam}${blockParam}`);
         if (!res.ok) return { ...EMPTY_HOLDERS, unavailable: true };
         const json = (await res.json()) as {
           holders: Array<{ address: Address; balance: string }>;
