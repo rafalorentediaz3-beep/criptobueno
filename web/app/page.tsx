@@ -36,7 +36,7 @@ type TabId = "growing" | "ancient";
 type SortId = "recent" | "new" | "old" | "mcap";
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "growing", label: "Hot coins" },
+  { id: "growing", label: "Coins" },
   { id: "ancient", label: "Ancients" },
 ];
 const SORTS: { id: SortId; label: string }[] = [
@@ -483,30 +483,39 @@ export default function DiscoverPage() {
   return (
     <div className="space-y-12">
       {/* Unified header + controls */}
-      <div className="relative hidden md:block">
-        <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-600" />
-        <input
-          type="search"
-          aria-label="Search coins by name or symbol"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tokens"
-          style={{ colorScheme: "light" }}
-          className="relative w-full appearance-none rounded-full border border-white/70 bg-white/60 py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-18px_42px_rgba(255,255,255,0.18),0_16px_36px_-24px_rgba(15,23,42,0.65)] outline-none backdrop-blur-2xl backdrop-saturate-150 placeholder:font-semibold placeholder:text-neutral-600 focus:border-white focus:ring-4 focus:ring-white/20"
-        />
-      </div>
+      <div className="space-y-5 sm:space-y-6">
+        <p
+          className="text-center text-xl font-normal italic leading-none text-neutral-100/65 drop-shadow-[0_0_18px_rgba(255,105,180,0.18)] sm:text-2xl"
+          style={{ fontFamily: 'Didot, "Bodoni MT", "Bodoni 72", Georgia, serif' }}
+        >
+          hot ideas born here.
+        </p>
 
-      {/* Mobile search — the header search bar is desktop-only (md:block). */}
-      <div className="relative md:hidden">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
-        <input
-          type="search"
-          aria-label="Search coins by name or symbol"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tokens"
-          className="w-full rounded-full border border-neutral-800 bg-neutral-900 py-3 pl-11 pr-4 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-neutral-700 focus:ring-4 focus:ring-white/5"
-        />
+        <div className="relative hidden md:block">
+          <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-600" />
+          <input
+            type="search"
+            aria-label="Search coins by name or symbol"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tokens"
+            style={{ colorScheme: "light" }}
+            className="relative w-full appearance-none rounded-full border border-white/70 bg-white/60 py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-18px_42px_rgba(255,255,255,0.18),0_16px_36px_-24px_rgba(15,23,42,0.65)] outline-none backdrop-blur-2xl backdrop-saturate-150 placeholder:font-semibold placeholder:text-neutral-600 focus:border-white focus:ring-4 focus:ring-white/20"
+          />
+        </div>
+
+        {/* Mobile search — the header search bar is desktop-only (md:block). */}
+        <div className="relative md:hidden">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+          <input
+            type="search"
+            aria-label="Search coins by name or symbol"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tokens"
+            className="w-full rounded-full border border-neutral-800 bg-neutral-900 py-3 pl-11 pr-4 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-neutral-700 focus:ring-4 focus:ring-white/5"
+          />
+        </div>
       </div>
 
       <div
@@ -519,7 +528,7 @@ export default function DiscoverPage() {
         <div className="mb-6 grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
-              {isAncientTab ? "Ancient Heritage" : "Hot coins"}
+              {isAncientTab ? "Ancient Heritage" : "Coins"}
               {isAncientTab ? (
                 <span
                   suppressHydrationWarning

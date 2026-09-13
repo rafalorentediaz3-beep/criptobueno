@@ -45,7 +45,7 @@ export function TokenCarousel({ rows }: { rows: TokenRow[] }) {
   const slotAt = (index: number, selected: number) =>
     ((index - selected + buffer) % total + total) % total - buffer;
   return (
-    <section className={styles.carousel} aria-label="Hot coins" aria-roledescription="carousel">
+    <section className={styles.carousel} aria-label="Coins" aria-roledescription="carousel">
       {canLoop && (
         <button type="button" className={`${styles.arrow} ${styles.previous}`} aria-label="Previous coins" title="Previous coins" onClick={() => move(-1)}><ArrowLeft size={20} /></button>
       )}
