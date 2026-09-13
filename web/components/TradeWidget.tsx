@@ -134,14 +134,22 @@ export function TradeWidget({
   const [mode, setMode] = useState<"buy" | "sell">("buy");
   const [amountIn, setAmountIn] = useState("");
   const [slippageBps, setSlippageBps] = useState<bigint>(500n);
-  const selectedV4Fee = v4Fee ?? 3_000;
+  const selectedV4Fee = v4Fee ?? 10_000;
   const tokenIs0 = BigInt(token) < BigInt(weth);
   const v4PoolKey = {
     currency0: tokenIs0 ? token : weth,
     currency1: tokenIs0 ? weth : token,
     fee: selectedV4Fee,
     tickSpacing:
-      selectedV4Fee === 100 ? 1 : selectedV4Fee === 500 ? 10 : selectedV4Fee === 3_000 ? 60 : 200,
+      selectedV4Fee === 100
+        ? 1
+        : selectedV4Fee === 500
+          ? 10
+          : selectedV4Fee === 3_000
+            ? 60
+            : selectedV4Fee === 20_000
+              ? 400
+              : 200,
     hooks: ZERO_ADDRESS,
   } as const;
   const v4ZeroForOne = mode === "buy" ? !tokenIs0 : tokenIs0;

@@ -88,9 +88,6 @@ export function TokenTraders({
             Holders
           </button>
         </div>
-        <span className="font-mono text-xs text-neutral-500">
-          {tab === "trades" ? trades.length : topHolders.length}
-        </span>
       </div>
 
       {tab === "trades" ? (
@@ -118,10 +115,10 @@ export function TokenTraders({
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className="block font-mono text-xs text-neutral-200">
+                    <span className="hidden">
                       {trade.wethAmount.toFixed(5)} WETH
                     </span>
-                    <span className="block text-[11px] text-neutral-500">
+                    <span className="block font-mono text-sm font-semibold tabular-nums text-neutral-100">
                       {ethUsd ? formatUsd(trade.wethAmount * ethUsd) : "—"}
                     </span>
                   </span>

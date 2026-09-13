@@ -162,7 +162,7 @@ export default function CreatePage() {
   const [staleClient, setStaleClient] = useState(false);
   const [creatorCutPct, setCreatorCutPct] = useState(0);
   const [launchMode, setLaunchMode] = useState<"v3" | "v4">("v4");
-  const [v4Fee, setV4Fee] = useState(3_000);
+  const [v4Fee, setV4Fee] = useState(10_000);
   const [launchWarning, setLaunchWarning] = useState("");
   const launchWarningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holderCutPct = CREATOR_HALF_PCT - creatorCutPct;
@@ -803,10 +803,8 @@ export default function CreatePage() {
                       value={v4Fee}
                       onChange={(e) => setV4Fee(Number(e.target.value))}
                     >
-                      <option value={100}>0.01%</option>
-                      <option value={500}>0.05%</option>
-                      <option value={3000}>0.30%</option>
-                      <option value={10000}>1.00%</option>
+                      <option value={10000}>1%</option>
+                      <option value={20000}>2%</option>
                     </select>
                     <p className="text-[10px] leading-relaxed text-neutral-500">
                       Fixed after launch.

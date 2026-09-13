@@ -28,12 +28,13 @@ describe("PotatoV4Pad", () => {
     return { deployer, treasury, creator, poolManager, positionManager, weth, pad };
   }
 
-  it("maps the selectable standard fee percentages to v4 fee/tick-spacing pairs", async () => {
+  it("maps the selectable fee percentages to v4 fee/tick-spacing pairs", async () => {
     const { pad } = await deploy();
     expect(await pad.tickSpacingForFee(100)).to.equal(1);
     expect(await pad.tickSpacingForFee(500)).to.equal(10);
     expect(await pad.tickSpacingForFee(3_000)).to.equal(60);
     expect(await pad.tickSpacingForFee(10_000)).to.equal(200);
+    expect(await pad.tickSpacingForFee(20_000)).to.equal(400);
     await expect(pad.tickSpacingForFee(2_500))
       .to.be.revertedWithCustomError(pad, "InvalidFee");
   });
@@ -46,16 +47,16 @@ describe("PotatoV4Pad", () => {
       "V4SPUD",
       NO_META,
       salt,
-      500,
+      20_000,
       { value: E / 10n },
     );
-    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Spud", "V4SPUD", NO_META, salt, 500, {
+    const tx = await ctx.pad.connect(ctx.creator).createToken("V4 Spud", "V4SPUD", NO_META, salt, 20_000, {
       value: E / 10n,
     });
     await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
     const info = await ctx.pad.v4Tokens(token);
     expect(info.creator).to.equal(ctx.creator.address);
-    expect(info.fee).to.equal(500);
+    expect(info.fee).to.equal(20_000);
     expect(info.positionId).to.equal(1);
     expect(info.poolId).to.equal(await ctx.poolManager.lastPoolKey());
 

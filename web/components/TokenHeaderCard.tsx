@@ -121,7 +121,7 @@ export function TokenHeaderCard({
                       className="text-xs text-amber-500/90 transition-colors hover:text-amber-400"
                       title="Coins this wallet has created"
                     >
-                      View planter
+                      check dev
                     </Link>
                   )}
                 </span>

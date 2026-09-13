@@ -27,6 +27,7 @@ import { useEthUsdPrice } from "@/lib/price";
 import { NotDeployed } from "@/components/NotDeployed";
 import { useSearch } from "@/components/SearchContext";
 import { TokenCard, type TokenRow } from "@/components/TokenCard";
+import { TokenCarousel } from "@/components/TokenCarousel";
 
 /** Discover feed is Robinhood-pinned; price with RH WETH, not wallet-chain WETH. */
 const RH_WETH = WETH_ADDRESSES[ANALYTICS_CHAIN_ID] ?? ZERO_ADDRESS;
@@ -344,6 +345,9 @@ export default function DiscoverPage() {
           marketCapUsd,
           createdAt: c.timestamp,
           imageURI: c.imageURI,
+          website: c.website,
+          twitter: c.twitter,
+          telegram: c.telegram,
           volume24Usd: c.volume24Usd,
           lastBuyAt: lastBuyAt(c.token),
           curve: isCurveTok,
@@ -418,6 +422,15 @@ export default function DiscoverPage() {
           (isAddressQuery && r.address.toLowerCase().startsWith(q)),
       );
     }
+    list = Array.from(
+      list
+        .reduce((unique, row) => {
+          const key = row.address.toLowerCase();
+          if (!unique.has(key)) unique.set(key, row);
+          return unique;
+        }, new Map<string, TokenRow>())
+        .values(),
+    );
     if (isAncientTab) {
       return [...list].sort((a, b) => (b.marketCapUsd ?? 0) - (a.marketCapUsd ?? 0));
     }
@@ -468,7 +481,7 @@ export default function DiscoverPage() {
     "rounded-full px-3.5 py-2 text-xs font-semibold tracking-tight transition-all";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-12">
       {/* Unified header + controls */}
       <div className="relative hidden md:block">
         <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-600" />
@@ -479,32 +492,8 @@ export default function DiscoverPage() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tokens"
           style={{ colorScheme: "light" }}
-          className="relative w-full appearance-none rounded-full border border-white/70 bg-white/60 py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-18px_rgba(15,23,42,0.5)] outline-none backdrop-blur-xl placeholder:font-semibold placeholder:text-neutral-600 focus:border-white focus:ring-4 focus:ring-white/20"
+          className="relative w-full appearance-none rounded-full border border-white/70 bg-white/60 py-3.5 pl-11 pr-4 text-sm font-medium text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-18px_42px_rgba(255,255,255,0.18),0_16px_36px_-24px_rgba(15,23,42,0.65)] outline-none backdrop-blur-2xl backdrop-saturate-150 placeholder:font-semibold placeholder:text-neutral-600 focus:border-white focus:ring-4 focus:ring-white/20"
         />
-      </div>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          {!isAncientTab && (
-            <div className="flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-18px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-              {SORTS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSort(s.id)}
-                  className={`rounded-full px-3.5 py-2 text-[11px] transition-all ${
-                  sort === s.id ? "bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)]" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
-                  }`}
-                >
-                  {s.id === "recent" && (
-                    <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${sort === s.id ? "bg-white" : "bg-amber-500"}`} />
-                  )}
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Mobile search — the header search bar is desktop-only (md:block). */}
@@ -520,15 +509,14 @@ export default function DiscoverPage() {
         />
       </div>
 
-      {/* Container panel: amber accent for Growing, stone-gray for Ancients */}
       <div
-        className={`rounded-[28px] border bg-neutral-900 p-5 sm:p-7 ${
+        className={
           isAncientTab
-            ? "border-neutral-800 shadow-[0_18px_60px_-35px_rgba(0,0,0,0.5)]"
-            : "border-neutral-700 shadow-[0_18px_60px_-30px_rgba(0,0,0,0.5)]"
-        }`}
+            ? "rounded-[28px] border border-neutral-800 bg-neutral-900 p-5 sm:p-7 shadow-[0_18px_60px_-35px_rgba(0,0,0,0.5)]"
+            : "relative left-1/2 w-[calc(100vw-2rem)] max-w-[1560px] -translate-x-1/2 sm:w-[94vw]"
+        }
       >
-        <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="mb-6 grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
               {isAncientTab ? "Ancient Heritage" : "Hot coins"}
@@ -553,13 +541,32 @@ export default function DiscoverPage() {
               <p className="mt-2 text-sm text-neutral-500">Verified legacy runners from Robinhood.</p>
             )}
           </div>
-          <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-neutral-800 px-4 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-neutral-700 sm:inline-flex">
+          {!isAncientTab && (
+            <div className="flex w-fit flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-18px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:justify-self-center">
+              {SORTS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSort(s.id)}
+                  className={`rounded-full px-3.5 py-2 text-[11px] transition-all ${
+                  sort === s.id ? "bg-[linear-gradient(180deg,#ffd84a_0%,#f2b90f_48%,#d88a05_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,218,0.7),0_4px_14px_-8px_rgba(180,108,0,0.9)]" : "text-neutral-500 hover:bg-white/10 hover:text-neutral-100"
+                  }`}
+                >
+                  {s.id === "recent" && (
+                    <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${sort === s.id ? "bg-white" : "bg-amber-500"}`} />
+                  )}
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <Link href="/create" className="hidden shrink-0 items-center gap-2 rounded-full bg-neutral-800 px-4 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-neutral-700 sm:inline-flex sm:justify-self-end">
             <span className="text-lg leading-none">+</span> Create
           </Link>
         </div>
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {Array.from({ length: 10 }).map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <CardSkeleton key={i} />
             ))}
           </div>
@@ -597,6 +604,8 @@ export default function DiscoverPage() {
                 : "Nothing in this patch of the field yet."}
             </p>
           </div>
+        ) : !isAncientTab ? (
+          <TokenCarousel rows={visible} />
         ) : (
           <div ref={gridRef} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {visible.map((row) => (

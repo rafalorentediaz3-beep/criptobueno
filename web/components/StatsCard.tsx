@@ -61,15 +61,10 @@ export function StatsCard({
           : marketCapUsd !== null
             ? formatUsd(marketCapUsd)
             : `${marketCapEth.toLocaleString("en-US", { maximumFractionDigits: 2 })} ETH`,
-      sub:
-        marketCapUsd !== null && marketCapEth > 0
-          ? `${marketCapEth.toLocaleString("en-US", { maximumFractionDigits: 2 })} ETH FDV`
-          : undefined,
     },
     {
-      label: "Volume",
+      label: "Volume 24h",
       value: volume24Usd > 0 ? formatUsd(volume24Usd) : "$0",
-      sub: "24h",
     },
     {
       label: "Holders",
@@ -86,7 +81,7 @@ export function StatsCard({
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               {row.label}
             </p>
-            <p className="mt-1 font-mono text-base font-bold tabular-nums text-neutral-100">
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-neutral-100 sm:text-[26px]">
               {row.value}
             </p>
             {row.sub && (
@@ -113,7 +108,7 @@ export function StatsCard({
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               {row.label}
             </p>
-            <p className="mt-1 font-mono text-sm tabular-nums text-neutral-100">{row.value}</p>
+            <p className="mt-1 font-mono text-xl font-bold tabular-nums text-neutral-100">{row.value}</p>
             {row.sub && (
               <p className="mt-0.5 font-mono text-[10px] tabular-nums text-neutral-500">{row.sub}</p>
             )}

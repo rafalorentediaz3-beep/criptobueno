@@ -4,7 +4,15 @@
 
 @layer base {
   body {
-    @apply bg-[#0a0a0a] text-neutral-100 antialiased selection:bg-lime-900/60;
+    @apply text-neutral-100 antialiased selection:bg-lime-900/60;
+    background-color: #0a0a0a;
+    background-image:
+      linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.68)),
+      url("/beach-background.png");
+    background-position: left top;
+    background-size: auto max(100vh, 49.1vw);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }
 
@@ -217,6 +225,37 @@
   .buy-flash-ring,
   .buy-chip,
   .card-enter {
+    animation: none;
+  }
+}
+
+/* Brief live-price pulse on the token marker, repeated every three minutes. */
+.token-chart-live-marker {
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.95),
+    0 0 10px rgba(245, 158, 11, 0.65);
+  animation: token-price-refresh 180s ease-in-out infinite;
+}
+
+@keyframes token-price-refresh {
+  0%,
+  1.5%,
+  100% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.95),
+      0 0 10px rgba(245, 158, 11, 0.65);
+  }
+  0.75% {
+    opacity: 0.72;
+    box-shadow:
+      0 0 0 2px rgba(251, 191, 36, 0.45),
+      0 0 16px rgba(245, 158, 11, 0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .token-chart-live-marker {
     animation: none;
   }
 }

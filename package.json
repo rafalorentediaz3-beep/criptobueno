@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "migrate": "node scripts/migrate.mjs",
-    "start": "node scripts/migrate.mjs && next start",
-    "test": "tsx --test lib/padStats.test.ts"
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "migrate": "npm --prefix web run migrate",
+    "start": "npm --prefix web run start",
+    "test": "npm --prefix web run test"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.0",

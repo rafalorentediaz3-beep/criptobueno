@@ -55,11 +55,27 @@ export function useV4SwapHistory(
   } | null>(null);
 
   return useQuery({
-    queryKey: ["v4-swap-history", chainId, poolId, weth, fromBlockHint?.toString()],
+    queryKey: ["v4-swap-history", chainId, token, poolId, weth, fromBlockHint?.toString()],
     enabled: enabled && !!poolId && !!client,
     refetchInterval: refetchIntervalMs,
     queryFn: async () => {
       if (!client || !poolId) return { points: [] as V4SwapPoint[], latestTs: 0 };
+      try {
+        const params = new URLSearchParams({
+          token,
+          poolId,
+          ...(fromBlockHint !== undefined ? { fromBlock: fromBlockHint.toString() } : {}),
+        });
+        const res = await fetch(`/api/v4-swaps?${params.toString()}`, {
+          signal: AbortSignal.timeout(45_000),
+        });
+        if (res.ok) {
+          return (await res.json()) as { points: V4SwapPoint[]; latestTs: number };
+        }
+      } catch {
+        // Fall back to browser RPC below. The server endpoint is an acceleration,
+        // not a correctness dependency.
+      }
       const cacheKey = `${chainId}:${poolId}:${weth}`;
       let cache = cacheRef.current;
       if (!cache || cache.key !== cacheKey) {

@@ -376,10 +376,11 @@ contract PotatoV4Pad is ReentrancyGuard {
     receive() external payable {}
 
     function tickSpacingForFee(uint24 fee) public pure returns (int24) {
-        if (fee == 100) return 1; // 0.01%
-        if (fee == 500) return 10; // 0.05%
-        if (fee == 3_000) return 60; // 0.30%
+        if (fee == 100) return 1; // 0.01% (legacy)
+        if (fee == 500) return 10; // 0.05% (legacy)
+        if (fee == 3_000) return 60; // 0.30% (legacy)
         if (fee == 10_000) return 200; // 1.00%
+        if (fee == 20_000) return 400; // 2.00%
         revert InvalidFee();
     }
 

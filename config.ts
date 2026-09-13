@@ -1,5 +1,4 @@
 import { defineChain, type Address, type Chain } from "viem";
-import { baseSepolia, hardhat } from "wagmi/chains";
 
 /**
  * Robinhood Chain mainnet (Arbitrum Orbit L2, chainId 4663). Not in wagmi/chains
@@ -178,29 +177,6 @@ export const CHAINS: ChainConfig[] = [
     ],
     uniswapSlug: "robinhood",
     geckoTerminalNetwork: "robinhood",
-  },
-  {
-    chain: baseSepolia,
-    padAddress: process.env.NEXT_PUBLIC_PAD_ADDRESS_BASE_SEPOLIA,
-    curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_BASE_SEPOLIA,
-    curvePadStartBlock: 0n,
-    weth: "0x4200000000000000000000000000000000000006",
-    padStartBlock: 0n,
-    uniswapSlug: "base_sepolia",
-    // NB: base-sepolia is NOT indexed by GeckoTerminal (404s), so no chart network.
-  },
-  {
-    chain: hardhat,
-    padAddress: process.env.NEXT_PUBLIC_PAD_ADDRESS_LOCALHOST,
-    curvePadAddress: process.env.NEXT_PUBLIC_CURVE_PAD_ADDRESS_LOCALHOST,
-    curvePadStartBlock: 0n, // fresh local chain scans from genesis
-    weth: envAddress(process.env.NEXT_PUBLIC_WETH_ADDRESS_LOCALHOST),
-    padStartBlock: 0n, // fresh local chain scans from genesis
-    // A local chain has no canonical Uniswap deployment, so the router and
-    // quoter are whatever `scripts/local-playground.ts` just deployed. Unset
-    // means no in-app trading, exactly as on any other unwired chain.
-    swapRouter: envAddressOpt(process.env.NEXT_PUBLIC_SWAP_ROUTER_LOCALHOST),
-    quoter: envAddressOpt(process.env.NEXT_PUBLIC_QUOTER_LOCALHOST),
   },
 ];
 

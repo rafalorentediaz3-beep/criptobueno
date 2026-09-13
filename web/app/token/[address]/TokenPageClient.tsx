@@ -226,7 +226,7 @@ export default function TokenPageClient() {
             ancient
             imageURI={ancient.imageUrl}
           />
-          <TokenChart token={token} pool={pool} />
+          <TokenChart token={token} pool={pool} imageURI={ancient.imageUrl} />
         </div>
 
         <div className="space-y-6">
@@ -326,6 +326,7 @@ export default function TokenPageClient() {
           bonded={resolved.bonded}
           progressBps={curve.progressBps}
           startBlock={creation?.blockNumber}
+          imageURI={creation?.imageURI}
         />
         <TokenTraders
           token={token}

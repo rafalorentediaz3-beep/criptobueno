@@ -16,6 +16,7 @@ import { useGeckoIndexed } from "@/lib/useGeckoIndexed";
 import { useEthUsdPrice } from "@/lib/price";
 import { useV4SwapHistory } from "@/lib/useV4SwapHistory";
 import { ProgressBar } from "@/components/ProgressBar";
+import { TokenAvatar } from "@/components/TokenAvatar";
 import { TOTAL_SUPPLY_WHOLE } from "@/lib/pool";
 
 /**
@@ -40,6 +41,7 @@ export function TokenChart({
   bonded = false,
   progressBps = 0n,
   startBlock,
+  imageURI,
 }: {
   token: Address;
   pool: Address;
@@ -56,6 +58,7 @@ export function TokenChart({
   progressBps?: bigint;
   /** Launch block bounds the first V4 history scan to this token's lifetime. */
   startBlock?: bigint;
+  imageURI?: string;
 }) {
   const { chainId } = usePad();
   const client = usePublicClient();
@@ -203,7 +206,9 @@ export function TokenChart({
   const zoomIn = () => setZoomY((z) => Math.min(8, z * 1.4));
   const zoomOut = () => setZoomY((z) => Math.max(0.25, z / 1.4));
   const zoomReset = () => setZoomY(1);
-  const rawSpan = Math.max(rawCandleMax - rawCandleMin, rawCandleMax * 0.0005, 1e-18);
+  // Keep enough vertical range for a useful market-cap scale even while a new
+  // token is trading flat. Otherwise every tick rounds to the same label.
+  const rawSpan = Math.max(rawCandleMax - rawCandleMin, rawCandleMax * 0.2, 1e-18);
   const mid = (rawCandleMax + rawCandleMin) / 2;
   const half = rawSpan / 2 / zoomY;
   const candleMin = mid - half;
@@ -251,16 +256,17 @@ export function TokenChart({
     linePoints.length > 0
       ? `${linePath} L ${linePoints[linePoints.length - 1].x} 100 L ${linePoints[0].x} 100 Z`
       : "";
+  const lastPoint = atLiveEdge && linePoints.length > 0 ? linePoints[linePoints.length - 1] : undefined;
 
   const displayPrice = hoverCandle ? hoverCandle.close : priceWeth;
   const displayTs = hoverCandle ? hoverTs : v4HistoryQuery.data?.latestTs;
 
   return (
-    <section className="card p-4 pt-5 sm:p-6 sm:pt-6">
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 font-semibold text-neutral-100">
-          <CandlestickChart className="h-4 w-4 text-amber-500" />
-          Price Chart
+    <section className="card p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-200">
+          <CandlestickChart className="h-4 w-4 text-amber-400" />
+          Price
         </h2>
         {embedUrl && (
           <span className="text-[11px] uppercase tracking-wider text-neutral-500">
@@ -286,21 +292,21 @@ export function TokenChart({
           />
         </div>
       ) : isV4 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
           {/* Big headline number, pump.fun/Axiom style: market cap (USD when we
               have a spot price, WETH otherwise) with a timestamp underneath. */}
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-mono text-2xl font-semibold text-neutral-50">
+              <div className="font-mono text-3xl font-bold tracking-tight text-neutral-50">
                 {displayPrice > 0 ? formatBigUsd(marketCap(displayPrice)) : "Loading…"}
               </div>
-              <div className="mt-0.5 text-[11px] text-neutral-500">
+              <div className="mt-1 text-[11px] text-neutral-500">
                 {displayTs ? formatDateTime(displayTs) : "\u00A0"}
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-1">
               {/* Timeframe switch — same idea as Axiom's row of candle widths. */}
-              <div className="flex gap-0.5 rounded-full bg-neutral-900 p-0.5">
+              <div className="flex gap-0.5 rounded-full border border-white/[0.06] bg-white/[0.04] p-1">
                 {(["Total", "5m", "15m", "1H", "1D", "1W"] as const).map((item) => (
                   <button
                     key={item}
@@ -309,7 +315,7 @@ export function TokenChart({
                       setIntervalOption(item);
                       setPanOffset(0);
                     }}
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${interval === item ? "bg-amber-500 text-black" : "text-neutral-400 hover:text-neutral-200"}`}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors ${interval === item ? "bg-neutral-100 text-neutral-950" : "text-neutral-500 hover:text-neutral-200"}`}
                   >
                     {item}
                   </button>
@@ -319,90 +325,107 @@ export function TokenChart({
           </div>
 
           {candles.length > 0 ? (
-            <div className="flex gap-2">
-              {/* Y axis: price scale (market cap), high at top / low at bottom. */}
-              <div className="flex w-20 flex-col justify-between py-1 text-right font-mono text-[9px] leading-none text-neutral-500">
-                {priceTicks.map((tick, i) => (
-                  <span key={i}>{formatBigUsd(marketCap(tick))}</span>
-                ))}
-              </div>
-              <div className="relative min-w-0 flex-1">
-                <svg
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  className="h-64 w-full cursor-crosshair"
-                  role="img"
-                  aria-label="V4 area chart: market cap over time, green when the visible window is up, red when down"
-                  onMouseMove={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-                    setHoverIndex(Math.min(candles.length - 1, Math.floor(pct * candles.length)));
-                  }}
-                  onMouseLeave={() => setHoverIndex(null)}
-                >
-                  <defs>
-                    <linearGradient id="chart-grid-fade" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3f3f46" stopOpacity="0.5" />
-                      <stop offset="100%" stopColor="#3f3f46" stopOpacity="0.15" />
-                    </linearGradient>
-                    <linearGradient id="chart-area-fill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={lineColor} stopOpacity="0.35" />
-                      <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Horizontal gridlines aligned with the price ticks on the left. */}
-                  {priceTicks.map((_, i) => (
-                    <line
-                      key={i}
-                      x1="0"
-                      x2="100"
-                      y1={(i / (priceTicks.length - 1)) * 92 + 4}
-                      y2={(i / (priceTicks.length - 1)) * 92 + 4}
-                      stroke="url(#chart-grid-fade)"
-                      strokeWidth="0.3"
-                      strokeDasharray="1.5,1.5"
-                    />
-                  ))}
-                  {areaPath && <path d={areaPath} fill="url(#chart-area-fill)" stroke="none" />}
-                  {linePath && (
-                    <path d={linePath} fill="none" stroke={lineColor} strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" />
-                  )}
-                  {hoverIndex !== null && linePoints[hoverIndex] && (
-                    <>
-                      <line
-                        x1={linePoints[hoverIndex].x}
-                        x2={linePoints[hoverIndex].x}
-                        y1={4}
-                        y2={96}
-                        stroke="#71717a"
-                        strokeWidth="0.3"
-                        strokeDasharray="1.5,1.5"
-                      />
-                      <circle cx={linePoints[hoverIndex].x} cy={linePoints[hoverIndex].y} r="1.2" fill={lineColor} />
-                    </>
-                  )}
-                  {/* Live pulse dot at the latest point when looking at the live edge. */}
-                  {atLiveEdge && linePoints.length > 0 && (
-                    <circle
-                      cx={linePoints[linePoints.length - 1].x}
-                      cy={linePoints[linePoints.length - 1].y}
-                      r="1"
-                      fill={lineColor}
-                    />
-                  )}
-                </svg>
-                {/* Floating crosshair tooltip, positioned above the hovered point. */}
-                {hoverIndex !== null && hoverCandle && linePoints[hoverIndex] && (
-                  <div
-                    className="pointer-events-none absolute top-1 -translate-x-1/2 rounded-md bg-neutral-800 px-2 py-1 text-[10px] shadow-lg"
-                    style={{ left: `${linePoints[hoverIndex].x}%` }}
+            <div>
+              <div className="relative">
+                <div className="relative mr-14">
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="h-72 w-full cursor-crosshair overflow-visible"
+                    role="img"
+                    aria-label="Market cap over time"
+                    onMouseMove={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                      setHoverIndex(Math.min(candles.length - 1, Math.floor(pct * candles.length)));
+                    }}
+                    onMouseLeave={() => setHoverIndex(null)}
                   >
-                    <div className="font-semibold text-neutral-100">{formatBigUsd(marketCap(hoverCandle.close))}</div>
-                    <div className="text-neutral-400">{formatDateTime(candleTimestamps[hoverIndex])}</div>
+                    <defs>
+                      <linearGradient id="chart-grid-fade" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3f3f46" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#3f3f46" stopOpacity="0.15" />
+                      </linearGradient>
+                      <linearGradient id="chart-area-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={lineColor} stopOpacity="0.35" />
+                        <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    {priceTicks.map((_, i) => (
+                      <line
+                        key={i}
+                        x1="0"
+                        x2="100"
+                        y1={(i / (priceTicks.length - 1)) * 92 + 4}
+                        y2={(i / (priceTicks.length - 1)) * 92 + 4}
+                        stroke="url(#chart-grid-fade)"
+                        strokeWidth="0.18"
+                      />
+                    ))}
+                    {areaPath && <path d={areaPath} fill="url(#chart-area-fill)" stroke="none" />}
+                    {linePath && (
+                      <path d={linePath} fill="none" stroke={lineColor} strokeWidth="0.7" strokeLinejoin="round" strokeLinecap="round" />
+                    )}
+                    {hoverIndex !== null && linePoints[hoverIndex] && (
+                      <>
+                        <line
+                          x1={linePoints[hoverIndex].x}
+                          x2={linePoints[hoverIndex].x}
+                          y1={4}
+                          y2={96}
+                          stroke="#71717a"
+                          strokeWidth="0.3"
+                          strokeDasharray="1.5,1.5"
+                        />
+                        <circle cx={linePoints[hoverIndex].x} cy={linePoints[hoverIndex].y} r="0.9" fill={lineColor} />
+                      </>
+                    )}
+                  </svg>
+                  {lastPoint && (
+                  <div
+                    className="token-chart-live-marker pointer-events-none absolute z-20 h-[11px] w-[11px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-950 p-px"
+                    style={{ left: `${lastPoint.x}%`, top: `${lastPoint.y}%` }}
+                    aria-hidden
+                  >
+                    <TokenAvatar
+                      address={token}
+                      imageURI={imageURI}
+                      size="sm"
+                      className="h-full w-full rounded-full border-0"
+                    />
                   </div>
-                )}
+                  )}
+                  {hoverIndex !== null && hoverCandle && linePoints[hoverIndex] && (
+                    <div
+                      className="pointer-events-none absolute top-2 -translate-x-1/2 rounded-lg border border-white/10 bg-neutral-950/95 px-2.5 py-1.5 text-[10px] shadow-lg"
+                      style={{ left: `${linePoints[hoverIndex].x}%` }}
+                    >
+                      <div className="font-semibold text-neutral-100">{formatBigUsd(marketCap(hoverCandle.close))}</div>
+                      <div className="text-neutral-400">{formatDateTime(candleTimestamps[hoverIndex])}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="pointer-events-none absolute right-0 top-0 z-10 h-72 w-14 border-l border-white/[0.07] bg-neutral-950/15 font-mono">
+                  {priceTicks.map((tick, index) => (
+                    <span
+                      key={index}
+                      className="absolute left-1.5 -translate-y-1/2 whitespace-nowrap text-[11px] font-semibold text-neutral-400"
+                      style={{ top: `${(index / (priceTicks.length - 1)) * 92 + 4}%` }}
+                    >
+                      {formatBigUsd(marketCap(tick))}
+                    </span>
+                  ))}
+                  {lastPoint && (
+                    <span
+                      className="absolute left-1 right-1 -translate-y-1/2 rounded-sm py-0.5 text-center text-[11px] font-bold text-white shadow-md"
+                      style={{ top: `${lastPoint.y}%`, backgroundColor: lineColor }}
+                    >
+                      {formatBigUsd(marketCap(candles[candles.length - 1].close))}
+                    </span>
+                  )}
+                </div>
                 {/* X axis: real clock time under a spread of candles. */}
-                <div className="mt-1 flex justify-between font-mono text-[9px] text-neutral-500">
+                <div className="mr-14 mt-2 flex justify-between font-mono text-[9px] text-neutral-600">
                   {candleTimestamps
                     .filter((_, i) => i % Math.max(1, Math.floor(candles.length / 6)) === 0)
                     .map((ts, i) => (
@@ -420,7 +443,7 @@ export function TokenChart({
           {/* Secondary controls row: refresh cadence, history pan, price zoom —
               kept compact/subtle below the chart so the headline number and
               timeframe pills stay the visual focus, like a real terminal. */}
-          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-neutral-800 pt-2 text-[10px] text-neutral-500">
+          <div className="hidden">
             <div className="flex items-center gap-1">
               <span className="uppercase text-neutral-600">Refresh</span>
               {(Object.keys(REFRESH_OPTIONS) as Array<keyof typeof REFRESH_OPTIONS>).map((item) => (

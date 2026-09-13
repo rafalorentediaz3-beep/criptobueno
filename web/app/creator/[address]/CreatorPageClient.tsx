@@ -168,14 +168,22 @@ export function CreatorPageClient({ address: raw }: { address: string }) {
     () =>
       pageItems.map((c) => {
         const price = pricesQuery.data?.get(c.token.toLowerCase()) ?? null;
+        const marketCapEth =
+          price != null
+            ? price * TOTAL_SUPPLY_WHOLE
+            : c.marketCapEth > 0
+              ? c.marketCapEth
+              : null;
         return {
           address: c.token as Address,
           name: c.name,
           symbol: c.symbol,
           creator: c.creator as Address,
           pool: c.pool as Address,
-          priceWeth: price,
-          marketCapEth: price != null ? price * TOTAL_SUPPLY_WHOLE : null,
+          priceWeth: price ?? (marketCapEth ? marketCapEth / TOTAL_SUPPLY_WHOLE : null),
+          marketCapEth,
+          marketCapUsd: c.marketCapUsd > 0 ? c.marketCapUsd : undefined,
+          volume24Usd: c.volume24Usd,
           createdAt: c.timestamp,
           imageURI: c.imageURI,
         };

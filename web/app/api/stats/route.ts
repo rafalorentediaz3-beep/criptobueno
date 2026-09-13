@@ -14,9 +14,9 @@ import { loadFeed } from "@/lib/tokenFeed";
 export const runtime = "nodejs";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
-const STATS_TTL_MS = 60_000;
+const STATS_TTL_MS = 15_000;
 const ALLTIME_TTL_MS = 30 * 60_000;
-const CACHE_HEADERS = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" };
+const CACHE_HEADERS = { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=15" };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -236,8 +236,8 @@ export async function GET() {
   // Refresh all-time volume + trades in the background; attach whatever's cached now.
   ensureAllTime(pools);
   ensureAllTimeTrades(pools);
-  const volumeAllTimeUsd = allTimeCache?.value ?? null;
-  const tradesAllTime = tradesCache?.value ?? null;
+  const volumeAllTimeUsd = pools.length > 0 ? (allTimeCache?.value ?? null) : 0;
+  const tradesAllTime = pools.length > 0 ? (tradesCache?.value ?? null) : 0;
 
   if (cache && cache.expiresAt > now) {
     return NextResponse.json(
@@ -253,13 +253,20 @@ export async function GET() {
   let traders24 = 0;
   let trades24 = 0;
   let activeTokens = 0;
+  for (const c of feed.creations) {
+    volume24Usd += c.volume24Usd ?? 0;
+    marketCapUsd += c.marketCapUsd ?? 0;
+    if ((c.volume24Usd ?? 0) > 0) activeTokens++;
+  }
   for (const c of withPool) {
     const a = attrs.get(c.pool.toLowerCase());
     if (!a) continue;
     const v = Number(a.volume_usd?.h24) || 0;
-    volume24Usd += v;
-    if (v > 0) activeTokens++;
-    marketCapUsd += Number(a.market_cap_usd ?? a.fdv_usd) || 0;
+    // Pool-level data fills V3-only fields and acts as a fallback for older
+    // creations that predate token-level enrichment in the feed.
+    if ((c.volume24Usd ?? 0) <= 0) volume24Usd += v;
+    if ((c.volume24Usd ?? 0) <= 0 && v > 0) activeTokens++;
+    if ((c.marketCapUsd ?? 0) <= 0) marketCapUsd += Number(a.market_cap_usd ?? a.fdv_usd) || 0;
     liquidityUsd += Number(a.reserve_in_usd) || 0;
     const tx = a.transactions?.h24 ?? {};
     traders24 += (Number(tx.buyers) || 0) + (Number(tx.sellers) || 0);

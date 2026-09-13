@@ -22,6 +22,9 @@ export interface TokenRow {
   createdAt?: number;
   /** launch image URL / ipfs hash from TokenCreated (optional) */
   imageURI?: string;
+  website?: string;
+  twitter?: string;
+  telegram?: string;
   /** Ancient (pre-existing Robinhood) token — renders USD stats + an Ancient badge. */
   ancient?: boolean;
   /** Ancient market cap (USD) from GeckoTerminal. */
