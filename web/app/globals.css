@@ -7,7 +7,7 @@
     @apply text-neutral-100 antialiased selection:bg-lime-900/60;
     background-color: #0a0a0a;
     background-image:
-      linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.68)),
+      linear-gradient(rgba(10, 10, 10, 0.52), rgba(10, 10, 10, 0.6)),
       url("/beach-background.png");
     background-position: left top;
     background-size: auto max(100vh, 49.1vw);

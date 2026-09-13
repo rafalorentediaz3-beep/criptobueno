@@ -528,7 +528,16 @@ export default function DiscoverPage() {
         <div className="mb-6 grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-neutral-100 sm:text-3xl">
-              {isAncientTab ? "Ancient Heritage" : "Coins"}
+              {isAncientTab ? (
+                "Ancient Heritage"
+              ) : (
+                <span
+                  className="font-normal italic"
+                  style={{ fontFamily: 'Didot, "Bodoni MT", "Bodoni 72", Georgia, serif' }}
+                >
+                  Coins
+                </span>
+              )}
               {isAncientTab ? (
                 <span
                   suppressHydrationWarning
