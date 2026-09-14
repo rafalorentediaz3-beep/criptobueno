@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -165,8 +166,9 @@ contract PotatoV4Pad is ReentrancyGuard {
         return _createToken(name, symbol, meta, salt, address(0), fee);
     }
 
-    /// @notice Launches a fixed-supply v4 position paired directly with a
-    /// Pons-approved Robinhood tokenized stock or ETP.
+    /// @notice Launches a fixed-supply v4 position paired with any 18-decimal
+    /// ERC20. Pons-listed assets use their registry valuation; other assets use
+    /// the pad's standard start FDV, denominated in the pair token.
     function createPairedToken(
         string calldata name,
         string calldata symbol,
@@ -197,14 +199,18 @@ contract PotatoV4Pad is ReentrancyGuard {
         address quoteToken = pairToken == address(0) ? address(weth) : pairToken;
         uint256 openingFdv = startFdv;
         if (quoteToken != address(weth)) {
-            if (!pairRegistry.approvedPairTokens(quoteToken)) revert PairTokenNotApproved();
-            (uint256 phantomQuote,, uint8 decimals) = pairRegistry.pairTokenEconomics(quoteToken);
-            if (phantomQuote == 0) revert PairTokenNotApproved();
-            if (decimals != 18) revert PairTokenDecimalsUnsupported();
+            if (quoteToken.code.length == 0) revert PairTokenNotApproved();
+            uint8 tokenDecimals = IERC20Metadata(quoteToken).decimals();
+            if (tokenDecimals != 18) revert PairTokenDecimalsUnsupported();
+
+            if (pairRegistry.approvedPairTokens(quoteToken)) {
+                (uint256 phantomQuote,, uint8 registryDecimals) = pairRegistry.pairTokenEconomics(quoteToken);
+                if (registryDecimals != tokenDecimals) revert PairTokenDecimalsUnsupported();
+                if (phantomQuote != 0) openingFdv = phantomQuote;
+            }
             if (msg.value != 0) revert UnexpectedNativeValue();
             // Paired launches retain PotatoPad's creator-selectable 1% / 2% tiers.
             if (fee != 10_000 && fee != 20_000) revert InvalidFee();
-            openingFdv = phantomQuote;
         }
         int24 tickSpacing = tickSpacingForFee(fee);
         if (banned[_normHashCalldata(name)] || banned[_normHashCalldata(symbol)]) {

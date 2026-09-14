@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ImagePlus, Loader2, Percent, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { bytesToHex, decodeEventLog } from "viem";
-import { useAccount, usePublicClient, useReadContracts, useSignMessage } from "wagmi";
+import { bytesToHex, createPublicClient, custom, decodeEventLog, erc20Abi, getAddress, isAddress } from "viem";
+import { useAccount, useConnectorClient, usePublicClient, useReadContracts, useSignMessage } from "wagmi";
 import { potatoCurvePadAbi, potatoV4PadAbi } from "@/lib/abi";
-import { SITE_URL } from "@/lib/config";
+import { robinhoodChain, SITE_URL } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
 import { useAncientTokens } from "@/lib/ancient";
 import { DESCRIPTION_MAX, tokenDescriptionHash } from "@/lib/feedback/message";
@@ -32,14 +32,12 @@ const CREATOR_HALF_PCT = 50;
  * offer a launch that reverts.
  */
 const MAX_CREATOR_CUT_PCT = CREATOR_HALF_PCT - 5;
-
 const inputCls =
   "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 outline-none transition-colors focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5";
 const labelCls = "text-[10px] font-bold uppercase tracking-wider text-neutral-500";
 
 let stockCatalogueCache: RobinhoodStock[] | null = null;
 let stockCatalogueRequest: Promise<RobinhoodStock[]> | null = null;
-
 function loadStockCatalogue() {
   if (stockCatalogueCache) return Promise.resolve(stockCatalogueCache);
   if (!stockCatalogueRequest) {
@@ -74,19 +72,24 @@ function launchSimulationError(error: unknown): string {
 function StockLogo({ stock }: { stock: RobinhoodStock }) {
   const [source, setSource] = useState(stock.imageUrl);
   return (
-    <img
-      src={source}
-      alt={`${stock.name} logo`}
-      loading="eager"
-      decoding="async"
-      className="h-6 w-6 shrink-0 rounded-full object-contain p-0"
-      onError={() => {
-        const localFallback = `/stock-logos/${encodeURIComponent(stock.symbol)}.png`;
-        if (source !== localFallback) {
-          setSource(localFallback);
-        }
-      }}
-    />
+    source ? (
+      <img
+        src={source}
+        alt={`${stock.name} logo`}
+        loading="eager"
+        decoding="async"
+        className="h-6 w-6 shrink-0 rounded-full object-contain p-0"
+        onError={() => {
+          const localFallback = `/stock-logos/${encodeURIComponent(stock.symbol)}.png`;
+          if (source !== localFallback) setSource(localFallback);
+          else setSource("");
+        }}
+      />
+    ) : (
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-bold text-neutral-600">
+        {stock.symbol.slice(0, 1)}
+      </span>
+    )
   );
 }
 
@@ -99,6 +102,13 @@ export default function CreatePage() {
   const canCreate = canLaunch || canV4Launch;
   const tx = useTx();
   const publicClient = usePublicClient({ chainId });
+  const { data: connectorClient } = useConnectorClient({ chainId });
+  const pairReadClient = useMemo(
+    () => connectorClient
+      ? createPublicClient({ chain: robinhoodChain, transport: custom(connectorClient.transport) })
+      : publicClient,
+    [connectorClient, publicClient],
+  );
   const { tokens: ancientTokens } = useAncientTokens();
   const { address: userAddress } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -154,6 +164,9 @@ export default function CreatePage() {
   const [stockQuery, setStockQuery] = useState("");
   const [pairedStock, setPairedStock] = useState<RobinhoodStock | null>(null);
   const [stocksLoading, setStocksLoading] = useState(false);
+  const [customPairAddress, setCustomPairAddress] = useState("");
+  const [customPairLoading, setCustomPairLoading] = useState(false);
+  const [customPairError, setCustomPairError] = useState("");
 
   // Holder rewards: share the creator's half of the fees with everyone holding.
   const [rewardsOn, setRewardsOn] = useState(false);
@@ -197,12 +210,90 @@ export default function CreatePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!pairedStock || pairedStock.imageUrl) return;
+    const address = pairedStock.address;
+    let cancelled = false;
+    fetch(`/api/robinhood/token-logo?address=${encodeURIComponent(address)}`)
+      .then(async (response) => {
+        if (!response.ok) return "";
+        const data = (await response.json()) as { imageUrl?: string };
+        return data.imageUrl ?? "";
+      })
+      .then((imageUrl) => {
+        if (cancelled || !imageUrl) return;
+        setPairedStock((current) =>
+          current?.address.toLowerCase() === address.toLowerCase()
+            ? { ...current, imageUrl }
+            : current,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pairedStock]);
+
   const matchingStocks = useMemo(() => {
     const query = stockQuery.trim().toLowerCase();
     return stocks
       .filter((stock) => !query || `${stock.symbol} ${stock.name}`.toLowerCase().includes(query))
       .slice(0, 80);
   }, [stockQuery, stocks]);
+
+  async function addCustomPair() {
+    setCustomPairError("");
+    if (!isAddress(customPairAddress.trim())) {
+      setCustomPairError("Enter a valid Robinhood Chain token address.");
+      return;
+    }
+    if (!pairReadClient) {
+      setCustomPairError("Robinhood Chain is not available. Check your wallet network and try again.");
+      return;
+    }
+
+    const address = getAddress(customPairAddress.trim());
+    setCustomPairLoading(true);
+    try {
+      const [nameResult, symbolResult, decimalsResult] = await Promise.all([
+        pairReadClient.readContract({ address, abi: erc20Abi, functionName: "name" }),
+        pairReadClient.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
+        pairReadClient.readContract({ address, abi: erc20Abi, functionName: "decimals" }),
+      ]);
+
+      if (decimalsResult !== 18) {
+        setCustomPairError("This token cannot be paired: the launch contract requires 18 decimals.");
+        return;
+      }
+      if (!nameResult.trim() || !symbolResult.trim()) {
+        setCustomPairError("The token did not return a valid name and symbol.");
+        return;
+      }
+
+      setPairedStock({
+        address,
+        name: nameResult.trim(),
+        symbol: symbolResult.trim().toUpperCase(),
+        decimals: 18,
+        type: "stock",
+        imageUrl: "",
+      });
+      setCustomPairAddress("");
+      setStockQuery("");
+      setDevBuy("");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setCustomPairError(
+        /403|forbidden/i.test(detail)
+          ? "Robinhood RPC rejected the read (403). Try again with a wallet connected to Robinhood Chain."
+          : /429|rate.?limit/i.test(detail)
+            ? "Robinhood RPC is rate-limiting reads. Wait a moment and try again."
+            : "Could not read this token on Robinhood Chain. Check the address and network.",
+      );
+    } finally {
+      setCustomPairLoading(false);
+    }
+  }
 
   async function handleUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -408,7 +499,7 @@ export default function CreatePage() {
       let gas: bigint | undefined;
       try {
         const simulation = pairedStock
-          ? await publicClient?.simulateContract({
+          ? await pairReadClient?.simulateContract({
               address: v4Pad,
               abi: potatoV4PadAbi,
               functionName: "createPairedToken",
@@ -610,7 +701,7 @@ export default function CreatePage() {
                   Pair asset
                 </label>
                 <p className="text-[11px] leading-relaxed text-neutral-500">
-                  Optional. The token will trade directly against the selected tokenized stock and creator fees will be paid in it.
+                  Optional. Pair with any 18-decimal Robinhood Chain token. Unlisted tokens use the pad&apos;s standard opening FDV, denominated in that token.
                 </p>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
@@ -622,13 +713,39 @@ export default function CreatePage() {
                     onChange={(event) => setStockQuery(event.target.value)}
                   />
                 </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    aria-label="Custom Robinhood token address"
+                    className={`${inputCls} min-w-0 font-mono text-xs`}
+                    placeholder="Or paste a Robinhood token address"
+                    value={customPairAddress}
+                    onChange={(event) => {
+                      setCustomPairAddress(event.target.value);
+                      setCustomPairError("");
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void addCustomPair()}
+                    disabled={customPairLoading || !customPairAddress.trim()}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {customPairLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Add token
+                  </button>
+                </div>
+                {customPairError && (
+                  <p role="alert" className="text-xs text-rose-600">{customPairError}</p>
+                )}
                 {pairedStock && (
                   <button
                     type="button"
-                    onClick={() => setPairedStock(null)}
+                    onClick={() => {
+                      setPairedStock(null);
+                    }}
                     className="flex w-full items-center gap-3 rounded-2xl border border-lime-200 bg-lime-50/70 p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(132,204,22,0.45)] backdrop-blur-xl"
                   >
-                    <StockLogo stock={pairedStock} />
+                    <StockLogo key={`${pairedStock.address}-${pairedStock.imageUrl}`} stock={pairedStock} />
                     <span className="min-w-0 flex-1">
                       <strong className="block truncate text-sm text-neutral-900">{pairedStock.symbol}</strong>
                       <span className="block truncate text-xs text-neutral-500">{pairedStock.name}</span>
@@ -664,7 +781,7 @@ export default function CreatePage() {
                           }}
                           className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/85 hover:shadow-sm"
                         >
-                          <StockLogo stock={stock} />
+                          <StockLogo key={stock.address} stock={stock} />
                           <span className="min-w-0">
                             <strong className="block text-sm text-neutral-900">{stock.symbol}</strong>
                             <span className="block truncate text-xs text-neutral-500">{stock.name}</span>
@@ -754,7 +871,7 @@ export default function CreatePage() {
                   <input
                     id="devbuy"
                     className={`${inputCls} pr-12 font-mono tabular-nums`}
-                    placeholder={pairedStock ? "Unavailable for stock pairs" : "0.00"}
+                    placeholder={pairedStock ? "Unavailable for token pairs" : "0.00"}
                     inputMode="decimal"
                     value={devBuy}
                     onChange={(e) => setDevBuy(e.target.value)}
@@ -800,7 +917,7 @@ export default function CreatePage() {
                       <option value={20_000}>2%</option>
                     </select>
                     <p className="text-[10px] leading-relaxed text-neutral-500">
-                      Fixed after launch. Stock-paired fees split 30% protocol / 70% creator in the paired asset.
+                      Fixed after launch. Paired fees split 30% protocol / 70% creator in the paired asset.
                     </p>
                   </div>
                 )}

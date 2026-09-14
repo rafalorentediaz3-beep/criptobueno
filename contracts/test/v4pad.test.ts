@@ -164,13 +164,42 @@ describe("PotatoV4Pad", () => {
     expect((await ctx.pad.v4Tokens(secondToken)).fee).to.equal(20_000);
   });
 
-  it("rejects unapproved pairs, non-18-decimal pairs, native value, and nonstandard fees", async () => {
+  it("launches an unlisted custom pair at the pad's standard opening FDV", async () => {
+    const ctx = await deploy();
+    const custom = await (await ethers.getContractFactory("WETH9")).deploy();
+    const salt = ethers.id("custom-pair");
+    const token = await ctx.pad.connect(ctx.creator).createPairedToken.staticCall(
+      "Custom Pair Potato",
+      "CPPAIR",
+      NO_META,
+      salt,
+      custom.target,
+      10_000,
+    );
+
+    const tx = await ctx.pad.connect(ctx.creator).createPairedToken(
+      "Custom Pair Potato",
+      "CPPAIR",
+      NO_META,
+      salt,
+      custom.target,
+      10_000,
+    );
+    await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
+    expect(await ctx.pairRegistry.approvedPairTokens(custom.target)).to.equal(false);
+    expect(await ctx.pad.quoteTokens(token)).to.equal(custom.target);
+    expect(await ctx.pad.startFdv()).to.equal(3n * E);
+  });
+
+  it("rejects non-18-decimal pairs, native value, and nonstandard fees", async () => {
     const ctx = await deploy();
     const stock = await (await ethers.getContractFactory("WETH9")).deploy();
     const args = ["Stock", "STK", NO_META, ethers.id("guards"), stock.target] as const;
 
-    await expect(ctx.pad.connect(ctx.creator).createPairedToken(...args, 10_000))
-      .to.be.revertedWithCustomError(ctx.pad, "PairTokenNotApproved");
+    const sixDecimal = await (await ethers.getContractFactory("SixDecimalToken")).deploy();
+    const sixDecimalArgs = ["Six Decimal", "SIX", NO_META, ethers.id("six-decimals"), sixDecimal.target] as const;
+    await expect(ctx.pad.connect(ctx.creator).createPairedToken(...sixDecimalArgs, 10_000))
+      .to.be.revertedWithCustomError(ctx.pad, "PairTokenDecimalsUnsupported");
     await ctx.pairRegistry.configure(stock.target, E, 6, true);
     await expect(ctx.pad.connect(ctx.creator).createPairedToken(...args, 10_000))
       .to.be.revertedWithCustomError(ctx.pad, "PairTokenDecimalsUnsupported");

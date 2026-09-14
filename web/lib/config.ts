@@ -25,6 +25,10 @@ export const robinhoodChain = defineChain({
 export const ZERO_ADDRESS =
   "0x0000000000000000000000000000000000000000" as Address;
 
+/** Canonical Pons v2 asset registry wired into the Robinhood V4 pad. */
+export const ROBINHOOD_PAIR_REGISTRY_ADDRESS: Address =
+  "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e";
+
 /** Canonical Uniswap V4 PoolManager per chain. */
 export const V4_POOL_MANAGER_ADDRESSES: Record<number, Address> = {
   4663: "0x8366a39CC670B4001A1121B8F6A443A643e40951",
@@ -162,11 +166,9 @@ export const CHAINS: ChainConfig[] = [
     curvePadStartBlock: 14_984_900n, // PotatoCurvePad 0x94085E…6069 (~$2.5k open / $44k bond, holder rewards) deploy block 14984902
     // Canonical live deployment. Keep this pinned so a stale Railway variable
     // cannot route launches back to a previous pad.
-    // Optional-dev-buy deployment: the initial LP position is always
-    // single-sided (100% token, zero WETH) so a launch never requires ETH;
-    // any ETH sent is an optional post-mint dev buy swapped against the pool.
-    v4PadAddress: "0x8117C8DAD42f969D5106dfd61d6406695b97D774",
-    v4PadStartBlock: 57688519n,
+    // Custom 18-decimal quote assets are supported by this V4 deployment.
+    v4PadAddress: "0x65fdA64BD9a8c1B20c092E86431528A071C0e3Fa",
+    v4PadStartBlock: 63_202_206n,
     // Verified on-chain (a live Uniswap pool's token0) and in Robinhood's docs.
     weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
     // Only Robinhood is wired for in-app trading (router + quoter present).
@@ -179,6 +181,13 @@ export const CHAINS: ChainConfig[] = [
     // so its tokens resolve; older direct pads follow in legacyPads.
     padStartBlock: 14_984_800n, // deploy block of the direct pad 0x88bb90…Ca07
     legacyPads: [
+      // Previous active V4 pad, before unlisted 18-decimal quote assets were enabled.
+      {
+        address: "0x8117C8DAD42f969D5106dfd61d6406695b97D774",
+        startBlock: 57_688_519n,
+        endBlock: 63_202_205n,
+        kind: "v4",
+      },
       // Previous active V4 pad: required a non-zero dev buy to mint its
       // bounded-range position (msg.value == 0 reverted). Superseded by the
       // single-sided, optional-dev-buy deployment above.

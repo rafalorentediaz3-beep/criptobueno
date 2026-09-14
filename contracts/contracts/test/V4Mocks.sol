@@ -24,6 +24,12 @@ contract MockPairRegistry {
     }
 }
 
+contract SixDecimalToken {
+    function decimals() external pure returns (uint8) {
+        return 6;
+    }
+}
+
 /// @dev Minimal but fund-accurate stand-in for the real v4 PoolManager. It
 /// does not implement Uniswap's tick/liquidity math; instead the dev-buy swap
 /// uses a fixed 1:1 nominal rate. This is enough to exercise
