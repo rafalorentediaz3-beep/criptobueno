@@ -33,6 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           avatar={GenericAvatar}
+          modalSize="compact"
           theme={darkTheme({
             accentColor: "#f59e0b",
             accentColorForeground: "#171717",

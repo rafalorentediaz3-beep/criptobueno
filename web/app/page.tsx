@@ -75,18 +75,6 @@ function readMarketCapCache(): Record<string, CachedMarketCap> {
   }
 }
 
-function CardSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-[28px] bg-neutral-900/40 ring-1 ring-white/[0.07]">
-      <div className="skeleton m-3 mb-0 aspect-square w-[calc(100%-1.5rem)] rounded-[20px]" />
-      <div className="space-y-2 p-4">
-        <div className="skeleton h-3 w-2/3" />
-        <div className="skeleton h-3 w-1/2" />
-      </div>
-    </div>
-  );
-}
-
 export default function DiscoverPage() {
   // `weth` is intentionally NOT taken from usePad: the feed is Robinhood-pinned,
   // so pricing uses RH_WETH rather than the connected wallet's chain WETH.
@@ -485,7 +473,7 @@ export default function DiscoverPage() {
       {/* Unified header + controls */}
       <div className="space-y-5 sm:space-y-6">
         <p
-          className="text-center text-xl font-normal italic leading-none text-neutral-100/65 drop-shadow-[0_0_18px_rgba(255,105,180,0.18)] sm:text-2xl"
+          className="hot-tagline text-center text-xl font-normal italic leading-none sm:text-2xl"
           style={{ fontFamily: 'Didot, "Bodoni MT", "Bodoni 72", Georgia, serif' }}
         >
           hot ideas born here.
@@ -583,11 +571,7 @@ export default function DiscoverPage() {
           </Link>
         </div>
         {loading ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
+          <div className="min-h-[420px]" aria-busy="true" aria-live="polite" />
         ) : activeRows.length === 0 ? (
           <div className="mx-auto max-w-lg px-6 py-12 text-center">
             {isAncientTab ? (

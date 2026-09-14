@@ -3,6 +3,7 @@
 // Kept separate from lib/config.ts: RainbowKit's getDefaultConfig is
 // client-only, and config.ts is also imported by server components.
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { metaMaskWallet, phantomWallet, zerionWallet } from "@rainbow-me/rainbowkit/wallets";
 import { http } from "viem";
 import { robinhoodChain } from "./config";
 import { robinhoodServerTransport } from "./serverRpc";
@@ -25,6 +26,12 @@ const chains = [robinhoodChain] as const;
 export const wagmiConfig = getDefaultConfig({
   appName: "PotatoPad",
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "potatopad-demo",
+  wallets: [
+    {
+      groupName: "Wallets",
+      wallets: [phantomWallet, zerionWallet, metaMaskWallet],
+    },
+  ],
   chains,
   transports: {
     [robinhoodChain.id]: robinhoodTransport,
