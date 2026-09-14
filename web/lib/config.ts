@@ -434,9 +434,10 @@ const UNISWAP_CHAIN_SLUGS: Record<number, string> = {
   ...byChain((c) => c.uniswapSlug),
 };
 
-export function uniswapSwapUrl(token: string, chainId?: number): string {
+export function uniswapSwapUrl(token: string, chainId?: number, inputCurrency?: string): string {
   const slug = (chainId !== undefined && UNISWAP_CHAIN_SLUGS[chainId]) || "robinhood";
-  return `https://app.uniswap.org/swap?outputCurrency=${token}&chain=${slug}`;
+  const input = inputCurrency ? `&inputCurrency=${inputCurrency}` : "";
+  return `https://app.uniswap.org/swap?outputCurrency=${token}${input}&chain=${slug}`;
 }
 
 /**

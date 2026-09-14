@@ -35,15 +35,17 @@ function priceWethPerToken(sqrtPriceX96: bigint, isToken0: boolean): number {
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   const poolId = req.nextUrl.searchParams.get("poolId");
+  const quoteTokenRaw = req.nextUrl.searchParams.get("quoteToken");
   const fromBlockRaw = req.nextUrl.searchParams.get("fromBlock");
-  if (!token || !isAddress(token) || !isHex32(poolId)) {
-    return NextResponse.json({ error: "invalid token or poolId" }, { status: 400 });
+  if (!token || !isAddress(token) || !isHex32(poolId) || (quoteTokenRaw !== null && !isAddress(quoteTokenRaw))) {
+    return NextResponse.json({ error: "invalid token, quoteToken, or poolId" }, { status: 400 });
   }
 
   const fromBlock =
     fromBlockRaw && /^\d+$/.test(fromBlockRaw) ? BigInt(fromBlockRaw) : undefined;
   const manager = V4_POOL_MANAGER_ADDRESSES[robinhoodChain.id] ?? ZERO_ADDRESS;
   const weth = WETH_ADDRESSES[robinhoodChain.id] ?? ZERO_ADDRESS;
+  const quoteToken = (quoteTokenRaw as Address | null) ?? weth;
   if (manager === ZERO_ADDRESS || weth === ZERO_ADDRESS) {
     return NextResponse.json({ points: [], latestTs: 0 });
   }
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
     }),
   );
   const timestamps = new Map(blockEntries);
-  const isToken0 = tokenIsToken0(token as Address, weth);
+  const isToken0 = tokenIsToken0(token as Address, quoteToken);
   const points = logs
     .map((log) => {
       const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });

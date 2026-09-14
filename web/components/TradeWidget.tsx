@@ -87,6 +87,8 @@ export function TradeWidget({
   v4Fee,
   isCurve = false,
   bonded = false,
+  pairToken,
+  pairSymbol,
 }: {
   token: Address;
   symbol: string;
@@ -103,6 +105,9 @@ export function TradeWidget({
   isCurve?: boolean;
   /** True once a curve token has bonded (its position locked into the fee locker). */
   bonded?: boolean;
+  /** V4 quote asset. Tokenized-stock pools use this instead of WETH. */
+  pairToken?: Address;
+  pairSymbol?: string;
 }) {
   const { address: user } = useAccount();
   const { chainId, weth } = usePad();
@@ -135,10 +140,11 @@ export function TradeWidget({
   const [amountIn, setAmountIn] = useState("");
   const [slippageBps, setSlippageBps] = useState<bigint>(500n);
   const selectedV4Fee = v4Fee ?? 10_000;
-  const tokenIs0 = BigInt(token) < BigInt(weth);
+  const quoteToken = pairToken ?? weth;
+  const tokenIs0 = BigInt(token) < BigInt(quoteToken);
   const v4PoolKey = {
-    currency0: tokenIs0 ? token : weth,
-    currency1: tokenIs0 ? weth : token,
+    currency0: tokenIs0 ? token : quoteToken,
+    currency1: tokenIs0 ? quoteToken : token,
     fee: selectedV4Fee,
     tickSpacing:
       selectedV4Fee === 100
@@ -153,7 +159,12 @@ export function TradeWidget({
     hooks: ZERO_ADDRESS,
   } as const;
   const v4ZeroForOne = mode === "buy" ? !tokenIs0 : tokenIs0;
-  const inApp = !!router && weth !== ZERO_ADDRESS && (!isV4 || (!!v4PoolId && !!quoter));
+  const isStockPair = isV4 && quoteToken.toLowerCase() !== weth.toLowerCase();
+  const inApp =
+    !!router &&
+    weth !== ZERO_ADDRESS &&
+    !isStockPair &&
+    (!isV4 || (!!v4PoolId && !!quoter));
 
   const amount = tryParseEther(amountIn);
   const hasAmount = amount !== undefined && amount > 0n;
@@ -236,10 +247,12 @@ export function TradeWidget({
             Live on Uniswap {isV4 ? "V4" : "V3"}
           </p>
           <p className="mt-1 text-xs text-neutral-400">
-            In-app trading isn&apos;t wired for this network. Trade directly on Uniswap.
+            {isStockPair
+              ? `This pool trades directly against ${pairSymbol ?? "the paired stock"}.`
+              : "In-app trading isn't wired for this network. Trade directly on Uniswap."}
           </p>
           <a
-            href={uniswapSwapUrl(token, chainId)}
+            href={uniswapSwapUrl(token, chainId, isStockPair ? quoteToken : undefined)}
             target="_blank"
             rel="noreferrer"
             className="btn-primary mt-4 w-full"

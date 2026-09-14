@@ -39,6 +39,8 @@ export function TokenChart({
   isCurve = false,
   isV4 = false,
   bonded = false,
+  pairToken,
+  pairSymbol,
   progressBps = 0n,
   startBlock,
   imageURI,
@@ -54,13 +56,16 @@ export function TokenChart({
   isV4?: boolean;
   /** True once the curve bonded (LP permanently locked). */
   bonded?: boolean;
+  /** V4 quote asset and display ticker for tokenized-stock pairs. */
+  pairToken?: Address;
+  pairSymbol?: string;
   /** Curve progress toward bond, 0–10000 bps (100% once bonded). */
   progressBps?: bigint;
   /** Launch block bounds the first V4 history scan to this token's lifetime. */
   startBlock?: bigint;
   imageURI?: string;
 }) {
-  const { chainId } = usePad();
+  const { chainId, weth } = usePad();
   const client = usePublicClient();
   const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m" | "1H" | "1D" | "1W">("Total");
   // How often the chart re-polls the chain for new swaps — selectable like
@@ -87,6 +92,7 @@ export function TokenChart({
     isV4 && !!client,
     REFRESH_OPTIONS[refreshLabel],
     startBlock,
+    pairToken,
   );
   const [initialChartTs] = useState(() => Math.floor(Date.now() / 1000));
   const v4Points = useMemo(() => {
@@ -219,7 +225,13 @@ export function TokenChart({
   const hoverTs = hoverIndex !== null ? candleTimestamps[hoverIndex] : undefined;
 
   const marketCap = (p: number) => p * TOTAL_SUPPLY_WHOLE;
-  const formatBigUsd = (ethAmount: number) => (ethUsd ? formatUsd(ethAmount * ethUsd) : `${ethAmount.toFixed(8)} WETH`);
+  const isStockPair = !!pairToken && pairToken.toLowerCase() !== weth.toLowerCase();
+  const formatBigUsd = (quoteAmount: number) =>
+    isStockPair
+      ? `${quoteAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${pairSymbol ?? "PAIR"}`
+      : ethUsd
+        ? formatUsd(quoteAmount * ethUsd)
+        : `${quoteAmount.toFixed(8)} WETH`;
   const formatDateTime = (ts: number) =>
     ts && ts > 0
       ? new Date(ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })

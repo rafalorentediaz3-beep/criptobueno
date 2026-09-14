@@ -342,8 +342,10 @@ export function usePoolStats(
   token: Address | undefined,
   pool: Address | undefined,
   v4PoolId?: Hex,
+  quoteToken?: Address,
 ): PoolStats {
   const { weth } = usePad();
+  const quote = quoteToken ?? weth;
   const chainId = useChainId();
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const isV4 = !!v4PoolId && v4Manager !== ZERO_ADDRESS;
@@ -361,7 +363,7 @@ export function usePoolStats(
       isV4
         ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [addSlot(v4StateSlot!, V4_LIQUIDITY_OFFSET)] }
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
-      { address: weth, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? weth] },
+      { address: quote, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? quote] },
     ],
     query: { enabled, staleTime: 15_000, refetchInterval: 30_000 },
   });
@@ -389,18 +391,19 @@ export function usePoolStats(
       return { ...ZERO_STATS, liquidity, wethInPool, unavailable: isError || !effectiveSqrtPrice };
     }
 
-    const isToken0 = token ? tokenIsToken0(token, weth) : true;
+    const isToken0 = token ? tokenIsToken0(token, quote) : true;
     const priceWeth = priceWethPerToken(effectiveSqrtPrice, isToken0);
+    const isWethQuote = quote.toLowerCase() === weth.toLowerCase();
     return {
       sqrtPriceX96: effectiveSqrtPrice,
       priceWeth,
-      marketCapEth: priceWeth * TOTAL_SUPPLY_WHOLE,
+      marketCapEth: isWethQuote ? priceWeth * TOTAL_SUPPLY_WHOLE : 0,
       liquidity,
       wethInPool,
       isLoading: false,
       unavailable: false,
     };
-  }, [enabled, isLoading, isError, data, token, weth]);
+  }, [enabled, isLoading, isError, data, token, quote, weth]);
 }
 
 // ---------------------------------------------------------------------------
@@ -587,6 +590,7 @@ export function useAccruedFees(
   pad: Address | undefined,
   isV4 = false,
   active = true,
+  quoteToken?: Address,
 ): AccruedFees {
   const { weth, chainId } = usePad();
   const client = usePublicClient();
@@ -684,9 +688,10 @@ export function useAccruedFees(
   return useMemo<AccruedFees>(() => {
     const raw = query.data;
     // token0 == weth -> amount0 is the WETH side; otherwise amount1 is WETH.
+    const quote = quoteToken ?? weth;
     const wethIsToken0 =
-      token0 !== undefined && weth !== ZERO_ADDRESS
-        ? token0.toLowerCase() === weth.toLowerCase()
+      token0 !== undefined && quote !== ZERO_ADDRESS
+        ? token0.toLowerCase() === quote.toLowerCase()
         : undefined;
 
     if (!raw || wethIsToken0 === undefined) {
@@ -707,5 +712,5 @@ export function useAccruedFees(
       isLoading: false,
       unavailable: false,
     };
-  }, [query.data, query.isLoading, enabled, token0, token1, weth, isV4, active]);
+  }, [query.data, query.isLoading, enabled, token0, token1, weth, quoteToken, isV4, active]);
 }

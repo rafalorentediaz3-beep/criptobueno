@@ -26,6 +26,8 @@ export function TokenTraders({
   pool,
   symbol,
   isV4,
+  pairToken,
+  pairSymbol,
   startBlock,
 }: {
   token: Address;
@@ -34,6 +36,8 @@ export function TokenTraders({
   pool: Address;
   symbol: string;
   isV4: boolean;
+  pairToken?: Address;
+  pairSymbol?: string;
   startBlock?: bigint;
 }) {
   const client = usePublicClient();
@@ -53,6 +57,7 @@ export function TokenTraders({
     isV4 && tab === "trades" && !!client,
     30_000,
     startBlock,
+    pairToken,
   );
   const trades = (tradesQuery.data?.points ?? []).slice().reverse().slice(0, 50);
 
@@ -115,11 +120,12 @@ export function TokenTraders({
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className="hidden">
-                      {trade.wethAmount.toFixed(5)} WETH
-                    </span>
                     <span className="block font-mono text-sm font-semibold tabular-nums text-neutral-100">
-                      {ethUsd ? formatUsd(trade.wethAmount * ethUsd) : "—"}
+                      {pairSymbol
+                        ? `${trade.wethAmount.toLocaleString("en-US", { maximumFractionDigits: 5 })} ${pairSymbol}`
+                        : ethUsd
+                          ? formatUsd(trade.wethAmount * ethUsd)
+                          : "—"}
                     </span>
                   </span>
                   <span className="w-10 shrink-0 text-right text-[11px] text-neutral-600">

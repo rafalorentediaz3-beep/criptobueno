@@ -63,6 +63,7 @@ export interface CreationEvent {
   poolId?: Hex;
   feeTier?: number;
   lpTokenId?: bigint;
+  quoteToken?: Address;
   /** "curve" (bonding curve) or "direct" (legacy direct-to-Uniswap). */
   kind: PadKind;
 }
@@ -227,6 +228,7 @@ export function useLaunchActivity({
           poolId: c.poolId,
           feeTier: c.feeTier,
           lpTokenId: c.lpTokenId ? BigInt(c.lpTokenId) : undefined,
+          quoteToken: c.quoteToken,
           kind: c.kind ?? "direct", // backward-compat for any kind-less payload
         }));
         const state: FeedState =

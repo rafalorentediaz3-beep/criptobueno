@@ -12,6 +12,7 @@ describe("PotatoV4Pad", () => {
       await ethers.getContractFactory("MockV4PositionManager")
     ).deploy(poolManager.target);
     const weth = await (await ethers.getContractFactory("WETH9")).deploy();
+    const pairRegistry = await (await ethers.getContractFactory("MockPairRegistry")).deploy();
     const pad = await (
       await ethers.getContractFactory("PotatoV4Pad")
     ).deploy(
@@ -22,10 +23,11 @@ describe("PotatoV4Pad", () => {
       positionManager.target,
       weth.target,
       "0x0000000000000000000000000000000000000002",
+      pairRegistry.target,
       deployer.address,
       [],
     );
-    return { deployer, treasury, creator, poolManager, positionManager, weth, pad };
+    return { deployer, treasury, creator, poolManager, positionManager, weth, pairRegistry, pad };
   }
 
   it("maps the selectable fee percentages to v4 fee/tick-spacing pairs", async () => {
@@ -104,5 +106,78 @@ describe("PotatoV4Pad", () => {
     await expect(tx).to.emit(ctx.pad, "DevBuy");
     const erc20 = await ethers.getContractAt("PotatoToken", token);
     expect(await erc20.balanceOf(ctx.creator.address)).to.equal(E / 10n);
+  });
+
+  it("launches against an approved tokenized stock at a selectable 1% or 2% fee", async () => {
+    const ctx = await deploy();
+    const stock = await (await ethers.getContractFactory("WETH9")).deploy();
+    await ctx.pairRegistry.configure(stock.target, 168n * E, 18, true);
+
+    const salt = ethers.id("stock-pair");
+    const token = await ctx.pad.connect(ctx.creator).createPairedToken.staticCall(
+      "Apple Potato",
+      "APPLP",
+      NO_META,
+      salt,
+      stock.target,
+      10_000,
+    );
+    const tx = ctx.pad.connect(ctx.creator).createPairedToken(
+        "Apple Potato",
+        "APPLP",
+        NO_META,
+        salt,
+        stock.target,
+        10_000,
+      );
+    await expect(tx).to.emit(ctx.pad, "V4PoolCreated");
+
+    expect(await ctx.pad.quoteTokens(token)).to.equal(stock.target);
+    const info = await ctx.pad.v4Tokens(token);
+    const locker = await ethers.getContractAt("PotatoV4FeeLocker", await ctx.pad.locker());
+    expect(await locker.launchedTokenByPosition(info.positionId)).to.equal(token);
+    expect(await locker.quoteTokenByPosition(info.positionId)).to.equal(stock.target);
+
+    await stock.deposit({ value: 100n * E });
+    await stock.transfer(ctx.positionManager.target, 100n * E);
+    await locker.collect(info.positionId);
+    expect(await locker.claimable(stock.target, ctx.creator.address)).to.equal(70n * E);
+    expect(await locker.claimable(stock.target, ctx.treasury.address)).to.equal(30n * E);
+
+    const secondSalt = ethers.id("stock-pair-two-percent");
+    const secondToken = await ctx.pad.connect(ctx.creator).createPairedToken.staticCall(
+      "Apple Potato Two",
+      "APLP2",
+      NO_META,
+      secondSalt,
+      stock.target,
+      20_000,
+    );
+    await ctx.pad.connect(ctx.creator).createPairedToken(
+      "Apple Potato Two",
+      "APLP2",
+      NO_META,
+      secondSalt,
+      stock.target,
+      20_000,
+    );
+    expect((await ctx.pad.v4Tokens(secondToken)).fee).to.equal(20_000);
+  });
+
+  it("rejects unapproved pairs, non-18-decimal pairs, native value, and nonstandard fees", async () => {
+    const ctx = await deploy();
+    const stock = await (await ethers.getContractFactory("WETH9")).deploy();
+    const args = ["Stock", "STK", NO_META, ethers.id("guards"), stock.target] as const;
+
+    await expect(ctx.pad.connect(ctx.creator).createPairedToken(...args, 10_000))
+      .to.be.revertedWithCustomError(ctx.pad, "PairTokenNotApproved");
+    await ctx.pairRegistry.configure(stock.target, E, 6, true);
+    await expect(ctx.pad.connect(ctx.creator).createPairedToken(...args, 10_000))
+      .to.be.revertedWithCustomError(ctx.pad, "PairTokenDecimalsUnsupported");
+    await ctx.pairRegistry.configure(stock.target, E, 18, true);
+    await expect(ctx.pad.connect(ctx.creator).createPairedToken(...args, 3_000))
+      .to.be.revertedWithCustomError(ctx.pad, "InvalidFee");
+    await expect(ctx.pad.connect(ctx.creator).createPairedToken(...args, 10_000, { value: 1n }))
+      .to.be.revertedWithCustomError(ctx.pad, "UnexpectedNativeValue");
   });
 });

@@ -12,6 +12,7 @@ export function StatsCard({
   pool,
   chainId,
   marketCapEth,
+  marketCapUsd: initialMarketCapUsd,
   onCurve = false,
   progressBps = 0n,
   volume24Usd: initialVolume24Usd,
@@ -26,6 +27,8 @@ export function StatsCard({
   chainId: number;
   /** fully-diluted valuation in ETH (float) */
   marketCapEth: number;
+  /** Quote-aware USD valuation supplied by the launch feed. */
+  marketCapUsd?: number;
   /** True while the token is in the pre-migration bonding-curve phase. */
   onCurve?: boolean;
   /** Curve progress toward the fill/migration price, 0–10000 bps (only when onCurve). */
@@ -49,17 +52,22 @@ export function StatsCard({
   const liveVolume24Usd = usePoolVolume24h(chainId, pool);
   const volume24Usd = liveVolume24Usd ?? initialVolume24Usd ?? 0;
 
-  const marketCapUsd = ethUsd !== null ? marketCapEth * ethUsd : null;
+  const marketCapUsd =
+    initialMarketCapUsd && initialMarketCapUsd > 0
+      ? initialMarketCapUsd
+      : ethUsd !== null && marketCapEth > 0
+        ? marketCapEth * ethUsd
+        : null;
 
   const rows: Array<{ label: string; value: string; sub?: string }> = [
     {
       label: "Market Cap",
       // USD headline; fall back to the ETH-denominated FDV if the feed is down.
       value:
-        marketCapEth <= 0
-          ? "…"
-          : marketCapUsd !== null
-            ? formatUsd(marketCapUsd)
+        marketCapUsd !== null
+          ? formatUsd(marketCapUsd)
+          : marketCapEth <= 0
+            ? "…"
             : `${marketCapEth.toLocaleString("en-US", { maximumFractionDigits: 2 })} ETH`,
     },
     {

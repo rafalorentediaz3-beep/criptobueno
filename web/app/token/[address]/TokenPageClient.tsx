@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAddress, isAddress } from "viem";
 import { useReadContract } from "wagmi";
-import { potatoTokenAbi } from "@/lib/abi";
-import { ZERO_ADDRESS } from "@/lib/config";
+import { potatoTokenAbi, potatoV4PadAbi } from "@/lib/abi";
+import { WETH_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
+import { ROBINHOOD_TOKENIZED_STOCKS } from "@/lib/stocks";
 import { useAncientTokens } from "@/lib/ancient";
 import { useLaunchActivity } from "@/lib/events";
 import { usePad, useTokenPad } from "@/lib/hooks";
@@ -54,6 +55,20 @@ export default function TokenPageClient() {
   );
   const isCurve = resolved.kind === "curve";
   const isV4 = resolved.kind === "v4";
+  const quoteRead = useReadContract({
+    address: resolved.pad,
+    abi: potatoV4PadAbi,
+    functionName: "quoteTokens",
+    args: token ? [token] : undefined,
+    query: { enabled: isV4 && !!token && resolved.pad !== ZERO_ADDRESS },
+  });
+  const storedQuote = quoteRead.data as `0x${string}` | undefined;
+  const quoteToken =
+    (storedQuote && storedQuote !== ZERO_ADDRESS ? storedQuote : creation?.quoteToken) ??
+    WETH_ADDRESSES[chainId];
+  const pairedStock = ROBINHOOD_TOKENIZED_STOCKS.find(
+    (stock) => stock.address.toLowerCase() === quoteToken?.toLowerCase(),
+  );
   // Do not issue curve-pad reads for V4/direct tokens.
   const curve = useCurveStats(isCurve ? token : undefined);
   // If no pad claims it, it may be a pre-existing "ancient" Robinhood token.
@@ -109,6 +124,7 @@ export default function TokenPageClient() {
     token,
     pool !== ZERO_ADDRESS ? pool : undefined,
     isV4 ? resolved.poolId : undefined,
+    isV4 ? quoteToken : undefined,
   );
   const marketCapEth =
     poolStats.marketCapEth > 0 ? poolStats.marketCapEth : (creation?.marketCapEth ?? 0);
@@ -302,6 +318,7 @@ export default function TokenPageClient() {
           creator={creator}
           chainId={chainId}
           launchMeta={creation}
+          pairedStock={pairedStock}
         />
         {/* Exchange-style stat strip: the numbers traders scan first, above the chart. */}
         <StatsCard
@@ -309,6 +326,7 @@ export default function TokenPageClient() {
           pool={pool !== ZERO_ADDRESS ? pool : undefined}
           chainId={chainId}
           marketCapEth={marketCapEth}
+          marketCapUsd={creation?.marketCapUsd}
           onCurve={onCurve}
           progressBps={curve.progressBps}
           volume24Usd={creation?.volume24Usd}
@@ -324,6 +342,8 @@ export default function TokenPageClient() {
           isV4={isV4}
           isCurve={isCurve}
           bonded={resolved.bonded}
+          pairToken={quoteToken}
+          pairSymbol={pairedStock?.symbol}
           progressBps={curve.progressBps}
           startBlock={creation?.blockNumber}
           imageURI={creation?.imageURI}
@@ -335,6 +355,8 @@ export default function TokenPageClient() {
           pool={pool}
           symbol={symbol ?? ""}
           isV4={isV4}
+          pairToken={quoteToken}
+          pairSymbol={pairedStock?.symbol}
           startBlock={creation?.blockNumber}
         />
       </div>
@@ -353,6 +375,8 @@ export default function TokenPageClient() {
           v4PoolId={resolved.poolId}
           v4Fee={resolved.feeTier}
           bonded={resolved.bonded}
+          pairToken={quoteToken}
+          pairSymbol={pairedStock?.symbol}
         />
         {/* Renders only for holder-rewards launches; a no-op otherwise. */}
         {!isV4 && (
@@ -366,6 +390,8 @@ export default function TokenPageClient() {
           symbol={symbol}
           pad={resolved.pad}
           isV4={isV4}
+          pairToken={quoteToken}
+          pairSymbol={pairedStock?.symbol}
         />
       </div>
     </div>

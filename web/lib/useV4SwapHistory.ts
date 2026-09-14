@@ -41,8 +41,10 @@ export function useV4SwapHistory(
   enabled: boolean,
   refetchIntervalMs: number,
   fromBlockHint?: bigint,
+  quoteToken?: Address,
 ) {
   const { chainId, weth } = usePad();
+  const quote = quoteToken ?? weth;
   const client = usePublicClient();
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const FALLBACK_BLOCKS = 250_000n;
@@ -55,7 +57,7 @@ export function useV4SwapHistory(
   } | null>(null);
 
   return useQuery({
-    queryKey: ["v4-swap-history", chainId, token, poolId, weth, fromBlockHint?.toString()],
+    queryKey: ["v4-swap-history", chainId, token, poolId, quote, fromBlockHint?.toString()],
     enabled: enabled && !!poolId && !!client,
     refetchInterval: refetchIntervalMs,
     queryFn: async () => {
@@ -64,6 +66,7 @@ export function useV4SwapHistory(
         const params = new URLSearchParams({
           token,
           poolId,
+          quoteToken: quote,
           ...(fromBlockHint !== undefined ? { fromBlock: fromBlockHint.toString() } : {}),
         });
         const res = await fetch(`/api/v4-swaps?${params.toString()}`, {
@@ -76,7 +79,7 @@ export function useV4SwapHistory(
         // Fall back to browser RPC below. The server endpoint is an acceleration,
         // not a correctness dependency.
       }
-      const cacheKey = `${chainId}:${poolId}:${weth}`;
+      const cacheKey = `${chainId}:${poolId}:${quote}`;
       let cache = cacheRef.current;
       if (!cache || cache.key !== cacheKey) {
         cache = { key: cacheKey, points: [], lastBlock: -1n, blockTsCache: new Map() };
@@ -128,7 +131,7 @@ export function useV4SwapHistory(
             }),
           );
           for (const [blockNumber, ts] of blockEntries) cache.blockTsCache.set(blockNumber.toString(), ts);
-          const isToken0 = tokenIsToken0(token, weth);
+          const isToken0 = tokenIsToken0(token, quote);
           const newPoints = logs
             .map((log) => {
               const decoded = decodeEventLog({ abi: [v4SwapEvent], data: log.data, topics: log.topics });

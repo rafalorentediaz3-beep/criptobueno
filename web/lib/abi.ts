@@ -4256,6 +4256,19 @@ export const potatoV4FeeLockerAbi = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "PAIRED_CREATOR_FEE_SHARE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -4320,6 +4333,25 @@ export const potatoV4FeeLockerAbi = [
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "launchedTokenByPosition",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -4415,12 +4447,36 @@ export const potatoV4FeeLockerAbi = [
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "quoteTokenByPosition",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "tokenId",
         "type": "uint256"
       },
       {
         "internalType": "address",
         "name": "launchedToken",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "quoteToken",
         "type": "address"
       },
       {
@@ -4515,6 +4571,11 @@ export const potatoV4PadAbi = [
         "type": "address"
       },
       {
+        "internalType": "contract IPonsPairRegistry",
+        "name": "pairRegistry_",
+        "type": "address"
+      },
+      {
         "internalType": "address",
         "name": "owner_",
         "type": "address"
@@ -4580,6 +4641,16 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
+    "name": "PairTokenDecimalsUnsupported",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PairTokenNotApproved",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
@@ -4592,6 +4663,11 @@ export const potatoV4PadAbi = [
       }
     ],
     "name": "SafeERC20FailedOperation",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnexpectedNativeValue",
     "type": "error"
   },
   {
@@ -4719,6 +4795,12 @@ export const potatoV4PadAbi = [
         "internalType": "bytes32",
         "name": "poolId",
         "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "quoteToken",
+        "type": "address"
       },
       {
         "indexed": false,
@@ -4858,6 +4940,72 @@ export const potatoV4PadAbi = [
         "type": "bytes32"
       },
       {
+        "internalType": "address",
+        "name": "pairToken",
+        "type": "address"
+      },
+      {
+        "internalType": "uint24",
+        "name": "fee",
+        "type": "uint24"
+      }
+    ],
+    "name": "createPairedToken",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "imageURI",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "website",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "twitter",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "telegram",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct PotatoV4Pad.TokenMeta",
+        "name": "meta",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
         "internalType": "uint24",
         "name": "fee",
         "type": "uint24"
@@ -4902,6 +5050,19 @@ export const potatoV4PadAbi = [
   },
   {
     "inputs": [],
+    "name": "pairRegistry",
+    "outputs": [
+      {
+        "internalType": "contract IPonsPairRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "permit2",
     "outputs": [
       {
@@ -4932,6 +5093,25 @@ export const potatoV4PadAbi = [
     "outputs": [
       {
         "internalType": "contract IUniswapV4PositionManager",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "quoteTokens",
+    "outputs": [
+      {
+        "internalType": "address",
         "name": "",
         "type": "address"
       }

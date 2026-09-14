@@ -16,6 +16,9 @@ const ROBINHOOD_V4 = {
   permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
   universalRouter: "0x06AfBA43Fd06227fA663b0DAecF536f6EaA6bf99",
   weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  // Canonical Pons v2 factory. PotatoPad reads only its public pair allowlist
+  // and per-asset economics; launches and fees remain in PotatoPad contracts.
+  pairRegistry: "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
 };
 
 const BANNED = [
@@ -58,6 +61,7 @@ async function main() {
     ROBINHOOD_V4.positionManager,
     ROBINHOOD_V4.weth,
     ROBINHOOD_V4.permit2,
+    ROBINHOOD_V4.pairRegistry,
     owner,
     BANNED,
   );

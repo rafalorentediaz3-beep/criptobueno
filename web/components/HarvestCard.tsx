@@ -71,6 +71,8 @@ export function HarvestCard({
   symbol,
   pad,
   isV4 = false,
+  pairToken,
+  pairSymbol,
 }: {
   creator: Address;
   lpTokenId: bigint;
@@ -82,11 +84,16 @@ export function HarvestCard({
   pad: Address;
   /** v4 uses the same collect/claim selectors but a PoolManager position. */
   isV4?: boolean;
+  pairToken?: Address;
+  pairSymbol?: string;
 }) {
   // Lock-at-launch: the single-sided position is minted straight into the locker,
   // so its swap fees are collectable/claimable from block one — even pre-bond.
   const { address: user, isConnected } = useAccount();
   const { weth, chainId } = usePad();
+  const feeAsset = pairToken ?? weth;
+  const feeSymbol = pairSymbol ?? "WETH";
+  const isStockPair = isV4 && feeAsset.toLowerCase() !== weth.toLowerCase();
   const isCreator = !!user && user.toLowerCase() === creator.toLowerCase();
   const collectTx = useTx();
   const claimWethTx = useTx();
@@ -112,7 +119,7 @@ export function HarvestCard({
   const treasury = (treasuryData as Address | undefined) ?? ZERO_ADDRESS;
   const isTreasury = !!user && user.toLowerCase() === treasury.toLowerCase();
   const canManageFees = isCreator || isTreasury;
-  const accrued = useAccruedFees(lpTokenId, pool, pad, isV4, canManageFees);
+  const accrued = useAccruedFees(lpTokenId, pool, pad, isV4, canManageFees, feeAsset);
 
   const {
     data: creatorClaimableWeth,
@@ -122,9 +129,9 @@ export function HarvestCard({
     address: lockerAddr,
     abi: lockerAbi,
     functionName: "claimable",
-    args: [weth, creator],
+    args: [feeAsset, creator],
     query: {
-      enabled: canManageFees && lockerReady && weth !== ZERO_ADDRESS,
+      enabled: canManageFees && lockerReady && feeAsset !== ZERO_ADDRESS,
       refetchInterval: 30_000,
     },
   });
@@ -147,7 +154,8 @@ export function HarvestCard({
     creatorClaimableWeth !== undefined && creatorClaimableToken !== undefined;
   const hasClaimable = claimableWeth > 0n || claimableToken > 0n;
   const hasUncollected = true;
-  const creatorWeth = claimableWeth + (accrued.wethAmount ?? 0n) / 2n;
+  const creatorWeth =
+    claimableWeth + ((accrued.wethAmount ?? 0n) * (isStockPair ? 7n : 5n)) / 10n;
 
   // Live claimable snapshot for timeout callbacks (avoid stale closures).
   const claimableRef = useRef({ weth: claimableWeth, token: claimableToken, known: claimablesKnown });
@@ -208,7 +216,7 @@ export function HarvestCard({
           address: lockerAddr,
           abi: lockerAbi,
           functionName: "claim",
-          args: [weth],
+          args: [feeAsset],
         });
       } else {
         claimTokenTxRef.current.writeContract({
@@ -219,7 +227,7 @@ export function HarvestCard({
         });
       }
     },
-    [lockerAbi, lockerAddr, weth, token],
+    [lockerAbi, lockerAddr, feeAsset, token],
   );
 
   function buildQueue(wethAmt: bigint, tokenAmt: bigint): ClaimAsset[] {
@@ -393,7 +401,7 @@ export function HarvestCard({
   else if (hasUncollected) label = "Collect & claim";
   else if (claimableWeth > 0n && claimableToken > 0n) label = "Claim fees";
   else if (claimableToken > 0n) label = `Claim ${symbol}`;
-  else label = "Claim WETH";
+  else label = `Claim ${feeSymbol}`;
 
   // Creator's realizable fees = already set-aside (claimable) + their 50% of what
   // is still uncollected in the pool. One figure so it never reads "0 WETH" while
@@ -411,15 +419,19 @@ export function HarvestCard({
         Creator fees
       </h3>
       <p className="mt-1 text-xs text-neutral-500">
-        Your 50% of WETH swap fees. Principal is locked forever and unruggable.
+        {isStockPair
+          ? `Your 70% of the 1% trading fee, paid in ${feeSymbol}.`
+          : "Your 50% of WETH swap fees. Principal is locked forever and unruggable."}
       </p>
 
       <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-950 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs text-neutral-500">Claimable (your 50%)</p>
+            <p className="text-xs text-neutral-500">
+              Claimable (your {isStockPair ? "70%" : "50%"})
+            </p>
             <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-neutral-100">
-              {claimablesKnown ? `${formatEth(creatorWeth)} WETH` : "…"}
+              {claimablesKnown ? `${formatEth(creatorWeth)} ${feeSymbol}` : "…"}
             </p>
           </div>
           <button
@@ -434,9 +446,11 @@ export function HarvestCard({
         </div>
 
         <p className="mt-2.5 text-[11px] text-neutral-600">
-          {isBurnPad
-            ? `Fees accrue as people trade. Collecting splits the WETH 50/50 with the treasury; the ${symbol} side is burned.`
-            : "Fees accrue as people trade. One click collects them into the locker and claims your share; the treasury auto-takes its 50%."}
+          {isStockPair
+            ? `Fees accrue in ${feeSymbol}. Collecting credits 70% to the creator and 30% to the protocol; the ${symbol} side is burned.`
+            : isBurnPad
+              ? `Fees accrue as people trade. Collecting splits the WETH 50/50 with the treasury; the ${symbol} side is burned.`
+              : "Fees accrue as people trade. One click collects them into the locker and claims your share; the treasury auto-takes its 50%."}
         </p>
         {isConnected && !isCreator && (
           <p className="mt-1 text-[11px] text-neutral-600">
@@ -446,7 +460,7 @@ export function HarvestCard({
         )}
 
         <TxStatus tx={collectTx} chainId={chainId} successLabel="Collected fees into the locker." />
-        <TxStatus tx={claimWethTx} chainId={chainId} successLabel="Claimed your WETH fees!" />
+        <TxStatus tx={claimWethTx} chainId={chainId} successLabel={`Claimed your ${feeSymbol} fees!`} />
         <TxStatus tx={claimTokenTx} chainId={chainId} successLabel={`Claimed your ${symbol} fees!`} />
       </div>
     </div>

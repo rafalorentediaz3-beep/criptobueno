@@ -8,6 +8,22 @@ interface IUnlockCallbackLike {
     function unlockCallback(bytes calldata data) external returns (bytes memory);
 }
 
+contract MockPairRegistry {
+    struct Economics {
+        uint256 phantomQuote;
+        uint256 graduationThreshold;
+        uint8 decimals;
+    }
+
+    mapping(address => bool) public approvedPairTokens;
+    mapping(address => Economics) public pairTokenEconomics;
+
+    function configure(address token, uint256 phantomQuote, uint8 decimals, bool approved) external {
+        approvedPairTokens[token] = approved;
+        pairTokenEconomics[token] = Economics(phantomQuote, phantomQuote * 5 / 2, decimals);
+    }
+}
+
 /// @dev Minimal but fund-accurate stand-in for the real v4 PoolManager. It
 /// does not implement Uniswap's tick/liquidity math; instead the dev-buy swap
 /// uses a fixed 1:1 nominal rate. This is enough to exercise
@@ -83,6 +99,13 @@ contract MockV4PositionManager is IUniswapV4PositionManager {
                 (address currency,,) = abi.decode(params[i], (address, uint256, bool));
                 uint256 bal = IERC20(currency).balanceOf(address(this));
                 if (bal != 0) IERC20(currency).transfer(poolManager, bal);
+            } else if (uint8(actions[i]) == 0x11) {
+                (address currency0, address currency1, address recipient) =
+                    abi.decode(params[i], (address, address, address));
+                uint256 amount0 = IERC20(currency0).balanceOf(address(this));
+                uint256 amount1 = IERC20(currency1).balanceOf(address(this));
+                if (amount0 != 0) IERC20(currency0).transfer(recipient, amount0);
+                if (amount1 != 0) IERC20(currency1).transfer(recipient, amount1);
             }
         }
         ++nextTokenId;

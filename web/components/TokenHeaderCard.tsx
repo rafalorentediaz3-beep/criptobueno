@@ -7,6 +7,7 @@ import { imageProxyCandidates, normalizeSocialUrl } from "@/lib/format";
 import { SOCIAL_OVERRIDES } from "@/lib/config";
 import { useTokenDescription } from "@/lib/tokenMeta/useTokenDescription";
 import type { CreationEvent } from "@/lib/events";
+import type { RobinhoodStock } from "@/lib/stocks";
 import { AddressChip } from "@/components/AddressChip";
 import { TokenAvatar } from "@/components/TokenAvatar";
 
@@ -19,6 +20,7 @@ export function TokenHeaderCard({
   ancient = false,
   imageURI,
   launchMeta,
+  pairedStock,
 }: {
   token: Address;
   name: string;
@@ -31,6 +33,7 @@ export function TokenHeaderCard({
   imageURI?: string;
   /** Parent-owned feed snapshot; avoids another feed observer and RPC watchers. */
   launchMeta?: CreationEvent;
+  pairedStock?: RobinhoodStock;
 }) {
   const meta = launchMeta;
   const description = useTokenDescription(ancient ? undefined : token);
@@ -105,6 +108,12 @@ export function TokenHeaderCard({
                   title="Pre-existing Robinhood token, not launched here"
                 >
                   Ancient
+                </span>
+              )}
+              {pairedStock && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/30 bg-lime-400/10 px-2 py-0.5 text-xs font-semibold text-lime-300">
+                  <img src={pairedStock.imageUrl} alt="" className="h-4 w-4 rounded-full object-contain" />
+                  Paired to ${pairedStock.symbol}
                 </span>
               )}
             </div>

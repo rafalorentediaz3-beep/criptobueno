@@ -14,6 +14,7 @@ contract PotatoV4FeeLocker is IERC721Receiver, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant CREATOR_FEE_SHARE_BPS = 5_000;
+    uint256 public constant PAIRED_CREATOR_FEE_SHARE_BPS = 7_000;
     uint256 private constant BPS = 10_000;
     address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
@@ -29,6 +30,8 @@ contract PotatoV4FeeLocker is IERC721Receiver, ReentrancyGuard {
     address public immutable treasury;
 
     mapping(uint256 => LockedPosition) public positions;
+    mapping(uint256 => address) public launchedTokenByPosition;
+    mapping(uint256 => address) public quoteTokenByPosition;
     mapping(address => mapping(address => uint256)) public claimable;
 
     event PositionLocked(uint256 indexed tokenId, address indexed token, address indexed creator);
@@ -53,12 +56,19 @@ contract PotatoV4FeeLocker is IERC721Receiver, ReentrancyGuard {
     function register(
         uint256 tokenId,
         address launchedToken,
+        address quoteToken,
         address creator,
         address token0,
         address token1
     ) external {
         if (msg.sender != pad) revert OnlyPad();
-        positions[tokenId] = LockedPosition({creator: creator, token0: token0, token1: token1});
+        positions[tokenId] = LockedPosition({
+            creator: creator,
+            token0: token0,
+            token1: token1
+        });
+        launchedTokenByPosition[tokenId] = launchedToken;
+        quoteTokenByPosition[tokenId] = quoteToken;
         emit PositionLocked(tokenId, launchedToken, creator);
     }
 
@@ -89,8 +99,8 @@ contract PotatoV4FeeLocker is IERC721Receiver, ReentrancyGuard {
 
         amount0 = IERC20(pos.token0).balanceOf(address(this)) - before0;
         amount1 = IERC20(pos.token1).balanceOf(address(this)) - before1;
-        _distribute(pos.token0, pos.creator, amount0);
-        _distribute(pos.token1, pos.creator, amount1);
+        _distribute(tokenId, pos, pos.token0, amount0);
+        _distribute(tokenId, pos, pos.token1, amount1);
         emit FeesCollected(tokenId, msg.sender, amount0, amount1);
     }
 
@@ -108,16 +118,26 @@ contract PotatoV4FeeLocker is IERC721Receiver, ReentrancyGuard {
         emit FeesClaimed(asset, msg.sender, amount);
     }
 
-    function _distribute(address asset, address creator, uint256 amount) internal {
+    function _distribute(uint256 tokenId, LockedPosition memory pos, address asset, uint256 amount) internal {
         if (amount == 0) return;
-        if (asset != address(weth)) {
+        if (asset == launchedTokenByPosition[tokenId]) {
             IERC20(asset).safeTransfer(DEAD, amount);
             emit TokenFeesBurned(asset, amount);
             return;
         }
-        uint256 creatorCut = (amount * CREATOR_FEE_SHARE_BPS) / BPS;
-        claimable[asset][creator] += creatorCut;
-        _payTreasury(asset, amount - creatorCut);
+        uint256 creatorShare = quoteTokenByPosition[tokenId] == address(weth)
+            ? CREATOR_FEE_SHARE_BPS
+            : PAIRED_CREATOR_FEE_SHARE_BPS;
+        uint256 creatorCut = (amount * creatorShare) / BPS;
+        claimable[asset][pos.creator] += creatorCut;
+        uint256 protocolCut = amount - creatorCut;
+        if (asset == address(weth)) {
+            _payTreasury(asset, protocolCut);
+        } else {
+            // Claim accounting keeps a non-standard ERC-20 recipient from
+            // blocking fee collection for every other beneficiary.
+            claimable[asset][treasury] += protocolCut;
+        }
     }
 
     function _payTreasury(address asset, uint256 amount) internal {

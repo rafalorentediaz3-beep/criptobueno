@@ -74,6 +74,8 @@ export interface CreationDTO {
   poolId?: Hex;
   feeTier?: number;
   lpTokenId?: string;
+  /** V4 quote currency. WETH for legacy launches, tokenized stock for paired launches. */
+  quoteToken?: Address;
   /** Which pad kind launched it: curve, legacy direct, or direct-to-v4. */
   kind: PadKind;
 }
@@ -185,6 +187,7 @@ async function scanPadRange(
 interface MarketSnapshot {
   volume24Usd: number;
   marketCapUsd: number;
+  priceUsd: number;
 }
 
 const v4ExtsloadAbi = [
@@ -206,9 +209,11 @@ function v4StateSlot(poolId: Hex): Hex {
 
 interface V4Snapshot {
   marketCapEth: number;
+  marketCapQuote: number;
   poolId: Hex;
   feeTier: number;
   lpTokenId: bigint;
+  quoteToken: Address;
 }
 
 async function fetchV4MarketCaps(
@@ -228,10 +233,21 @@ async function fetchV4MarketCaps(
       args: [token],
     })),
   });
+  const quoteReads = await client.multicall({
+    allowFailure: true,
+    contracts: tokens.map(({ token, pad }) => ({
+      address: pad,
+      abi: potatoV4PadAbi,
+      functionName: "quoteTokens" as const,
+      args: [token],
+    })),
+  });
   const resolved = tokens.flatMap((entry, index) => {
     const value = tokenReads[index]?.result as readonly [Address, Hex, bigint, number] | undefined;
+    const storedQuote = quoteReads[index]?.result as Address | undefined;
+    const quoteToken = storedQuote && storedQuote !== ZERO_ADDRESS ? storedQuote : weth;
     return value?.[0] && value[0] !== ZERO_ADDRESS
-      ? [{ ...entry, poolId: value[1], lpTokenId: value[2], feeTier: Number(value[3]) }]
+      ? [{ ...entry, poolId: value[1], lpTokenId: value[2], feeTier: Number(value[3]), quoteToken }]
       : [];
   });
   if (resolved.length === 0) return out;
@@ -245,18 +261,20 @@ async function fetchV4MarketCaps(
       args: [v4StateSlot(poolId)],
     })),
   });
-  resolved.forEach(({ token, poolId, lpTokenId, feeTier }, index) => {
+  resolved.forEach(({ token, poolId, lpTokenId, feeTier, quoteToken }, index) => {
     const word = stateReads[index]?.result as Hex | undefined;
     const sqrtPriceX96 = word ? BigInt(word) & ((1n << 160n) - 1n) : 0n;
     let marketCapEth = 0;
+    let marketCapQuote = 0;
     if (sqrtPriceX96 > 0n) {
       const ratio = Number(sqrtPriceX96) / Q96;
       const rawPrice = ratio * ratio;
-      const priceWeth = BigInt(token) < BigInt(weth) ? rawPrice : 1 / rawPrice;
-      const calculated = priceWeth * TOTAL_SUPPLY_WHOLE;
-      if (Number.isFinite(calculated) && calculated > 0) marketCapEth = calculated;
+      const priceQuote = BigInt(token) < BigInt(quoteToken) ? rawPrice : 1 / rawPrice;
+      const calculated = priceQuote * TOTAL_SUPPLY_WHOLE;
+      if (Number.isFinite(calculated) && calculated > 0) marketCapQuote = calculated;
+      if (quoteToken.toLowerCase() === weth.toLowerCase()) marketCapEth = marketCapQuote;
     }
-    out.set(token.toLowerCase(), { marketCapEth, poolId, lpTokenId, feeTier });
+    out.set(token.toLowerCase(), { marketCapEth, marketCapQuote, poolId, lpTokenId, feeTier, quoteToken });
   });
   return out;
 }
@@ -290,6 +308,7 @@ async function fetchMarketSnapshots(
             volume_usd?: { h24?: string };
             fdv_usd?: string;
             market_cap_usd?: string;
+            price_usd?: string;
           };
         }[];
       };
@@ -300,6 +319,7 @@ async function fetchMarketSnapshots(
             volume24Usd: Number(t.attributes?.volume_usd?.h24) || 0,
             marketCapUsd:
               Number(t.attributes?.fdv_usd) || Number(t.attributes?.market_cap_usd) || 0,
+            priceUsd: Number(t.attributes?.price_usd) || 0,
           });
         }
       }
@@ -440,15 +460,26 @@ async function scan(): Promise<FeedPayload> {
   const creations = [...byToken.values()];
   const markets = await marketTask;
   const v4MarketCaps = await v4MarketCapTask;
+  const quoteMarkets = await fetchMarketSnapshots(
+    [...new Set(
+      [...v4MarketCaps.values()]
+        .map((snapshot) => snapshot.quoteToken)
+        .filter((quote) => quote.toLowerCase() !== (WETH_ADDRESSES[robinhoodChain.id] ?? ZERO_ADDRESS).toLowerCase()),
+    )],
+  );
   for (const c of creations) {
     const market = markets.get(c.token.toLowerCase());
     c.volume24Usd = market?.volume24Usd ?? 0;
     c.marketCapUsd = market?.marketCapUsd ?? 0;
     const v4 = v4MarketCaps.get(c.token.toLowerCase());
+    if (c.marketCapUsd === 0 && v4) {
+      c.marketCapUsd = v4.marketCapQuote * (quoteMarkets.get(v4.quoteToken.toLowerCase())?.priceUsd ?? 0);
+    }
     c.marketCapEth = v4?.marketCapEth ?? 0;
     c.poolId = v4?.poolId;
     c.feeTier = v4?.feeTier;
     c.lpTokenId = v4?.lpTokenId.toString();
+    c.quoteToken = v4?.quoteToken;
   }
   // A partial scan (some window failed) surfaces as "unavailable" so the client
   // shows a warm cache rather than treating a truncated list as complete.

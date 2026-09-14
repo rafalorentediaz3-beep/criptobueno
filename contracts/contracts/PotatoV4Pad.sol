@@ -19,6 +19,17 @@ interface IPermit2Approval {
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
+/// @notice Pons v2 is used as the canonical Robinhood tokenized-asset registry.
+/// Its allowlist is owner-curated and its per-asset phantom quote provides a
+/// decimal-aware opening valuation for each approved pair token.
+interface IPonsPairRegistry {
+    function approvedPairTokens(address pairToken) external view returns (bool);
+    function pairTokenEconomics(address pairToken)
+        external
+        view
+        returns (uint256 phantomQuote, uint256 graduationThreshold, uint8 decimals);
+}
+
 /// @title PotatoV4Pad
 /// @notice Optional direct-to-Uniswap-v4 launcher. PotatoCurvePad remains the
 /// primary v3 launcher; this contract is an independent deployment and does not
@@ -41,6 +52,7 @@ contract PotatoV4Pad is ReentrancyGuard {
     /// @dev Stored for deployment/config introspection. PositionManager uses
     /// Permit2 internally; this pad deliberately settles from its own balance.
     address public immutable permit2;
+    IPonsPairRegistry public immutable pairRegistry;
     PotatoV4FeeLocker public immutable locker;
     PotatoV4TokenFactory public immutable tokenFactory;
     address public immutable owner;
@@ -60,6 +72,8 @@ contract PotatoV4Pad is ReentrancyGuard {
     }
 
     mapping(address => V4Info) public v4Tokens;
+    /// @notice Quote asset for a launch. WETH is stored explicitly as well.
+    mapping(address => address) public quoteTokens;
     mapping(bytes32 => bool) public banned;
 
     event TokenCreated(
@@ -76,6 +90,7 @@ contract PotatoV4Pad is ReentrancyGuard {
     event V4PoolCreated(
         address indexed token,
         bytes32 indexed poolId,
+        address indexed quoteToken,
         uint24 fee,
         int24 tickSpacing,
         uint256 positionId
@@ -93,6 +108,9 @@ contract PotatoV4Pad is ReentrancyGuard {
     error OnlyPoolManager();
     error DevBuyExceedsCap();
     error EthTransferFailed();
+    error PairTokenNotApproved();
+    error PairTokenDecimalsUnsupported();
+    error UnexpectedNativeValue();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
@@ -107,13 +125,15 @@ contract PotatoV4Pad is ReentrancyGuard {
         IUniswapV4PositionManager positionManager_,
         IERC20 weth_,
         address permit2_,
+        IPonsPairRegistry pairRegistry_,
         address owner_,
         string[] memory initialBannedWords_
     ) {
         if (
             treasury_ == address(0) || startFdv_ == 0 || address(poolManager_) == address(0)
                 || address(positionManager_) == address(0) || address(weth_) == address(0)
-                || permit2_ == address(0) || owner_ == address(0)
+                || permit2_ == address(0) || address(pairRegistry_) == address(0)
+                || owner_ == address(0)
         ) revert InvalidConfig();
         treasury = treasury_;
         startFdv = startFdv_;
@@ -122,6 +142,7 @@ contract PotatoV4Pad is ReentrancyGuard {
         positionManager = positionManager_;
         weth = weth_;
         permit2 = permit2_;
+        pairRegistry = pairRegistry_;
         owner = owner_;
         locker = new PotatoV4FeeLocker(positionManager_, IWETH9V4(address(weth_)), treasury_);
         tokenFactory = new PotatoV4TokenFactory(
@@ -132,13 +153,8 @@ contract PotatoV4Pad is ReentrancyGuard {
         }
     }
 
-    /// @notice Launches a fixed-supply v4 position. The initial LP position is
-    /// always single-sided (100% token, zero WETH), so a token can always be
-    /// launched with no ETH. Supported trading fees are 0.01%, 0.05%, 0.30%,
-    /// and 1.00%.
-    /// @dev msg.value is an OPTIONAL dev buy: if non-zero, it is swapped for
-    /// the freshly-seeded token right after the position is minted, exactly
-    /// like the v3 curve pad's dev buy. It is never required to launch.
+    /// @notice Launches a fixed-supply WETH v4 position. Kept ABI-compatible
+    /// with the currently deployed pad.
     function createToken(
         string calldata name,
         string calldata symbol,
@@ -146,6 +162,50 @@ contract PotatoV4Pad is ReentrancyGuard {
         bytes32 salt,
         uint24 fee
     ) external payable nonReentrant returns (address token) {
+        return _createToken(name, symbol, meta, salt, address(0), fee);
+    }
+
+    /// @notice Launches a fixed-supply v4 position paired directly with a
+    /// Pons-approved Robinhood tokenized stock or ETP.
+    function createPairedToken(
+        string calldata name,
+        string calldata symbol,
+        TokenMeta calldata meta,
+        bytes32 salt,
+        address pairToken,
+        uint24 fee
+    ) external payable nonReentrant returns (address token) {
+        if (pairToken == address(0)) revert PairTokenNotApproved();
+        return _createToken(name, symbol, meta, salt, pairToken, fee);
+    }
+
+    /// @notice Launches a fixed-supply v4 position. The initial LP position is
+    /// always single-sided (100% token, zero quote), so a token can always be
+    /// launched with no ETH. WETH launches retain the existing fee tiers;
+    /// stock-paired launches let the creator choose 1.00% or 2.00%.
+    /// @dev msg.value is an OPTIONAL dev buy: if non-zero, it is swapped for
+    /// the freshly-seeded token right after the position is minted, exactly
+    /// like the v3 curve pad's dev buy. It is never required to launch.
+    function _createToken(
+        string calldata name,
+        string calldata symbol,
+        TokenMeta calldata meta,
+        bytes32 salt,
+        address pairToken,
+        uint24 fee
+    ) internal returns (address token) {
+        address quoteToken = pairToken == address(0) ? address(weth) : pairToken;
+        uint256 openingFdv = startFdv;
+        if (quoteToken != address(weth)) {
+            if (!pairRegistry.approvedPairTokens(quoteToken)) revert PairTokenNotApproved();
+            (uint256 phantomQuote,, uint8 decimals) = pairRegistry.pairTokenEconomics(quoteToken);
+            if (phantomQuote == 0) revert PairTokenNotApproved();
+            if (decimals != 18) revert PairTokenDecimalsUnsupported();
+            if (msg.value != 0) revert UnexpectedNativeValue();
+            // Paired launches retain PotatoPad's creator-selectable 1% / 2% tiers.
+            if (fee != 10_000 && fee != 20_000) revert InvalidFee();
+            openingFdv = phantomQuote;
+        }
         int24 tickSpacing = tickSpacingForFee(fee);
         if (banned[_normHashCalldata(name)] || banned[_normHashCalldata(symbol)]) {
             revert BannedName();
@@ -167,9 +227,9 @@ contract PotatoV4Pad is ReentrancyGuard {
         if (token != predicted) revert InvalidSalt();
 
         PotatoToken(token).setPool(address(poolManager));
-        bool tokenIs0 = token < address(weth);
+        bool tokenIs0 = token < quoteToken;
         int24 floor = _alignToSpacing(
-            TickMath.getTickAtSqrtRatio(_sqrtPriceX96FromFdv(startFdv)), tickSpacing
+            TickMath.getTickAtSqrtRatio(_sqrtPriceX96FromFdv(openingFdv)), tickSpacing
         );
         int24 minTick = (TickMath.MIN_TICK / tickSpacing) * tickSpacing;
         int24 maxTick = (TickMath.MAX_TICK / tickSpacing) * tickSpacing;
@@ -185,8 +245,8 @@ contract PotatoV4Pad is ReentrancyGuard {
         uint160 sqrtPrice = TickMath.getSqrtRatioAtTick(center);
 
         IUniswapV4PoolManager.PoolKey memory key = IUniswapV4PoolManager.PoolKey({
-            currency0: tokenIs0 ? token : address(weth),
-            currency1: tokenIs0 ? address(weth) : token,
+            currency0: tokenIs0 ? token : quoteToken,
+            currency1: tokenIs0 ? quoteToken : token,
             fee: fee,
             tickSpacing: tickSpacing,
             hooks: address(0)
@@ -255,14 +315,15 @@ contract PotatoV4Pad is ReentrancyGuard {
         positionManager.modifyLiquidities(abi.encode(actions, params), block.timestamp);
         uint256 leftoverToken = IERC20(token).balanceOf(address(this));
         if (leftoverToken != 0) IERC20(token).safeTransfer(DEAD, leftoverToken);
-        locker.register(positionId, token, msg.sender, key.currency0, key.currency1);
+        locker.register(positionId, token, quoteToken, msg.sender, key.currency0, key.currency1);
 
         bytes32 poolId = keccak256(abi.encode(key));
         v4Tokens[token] = V4Info(msg.sender, poolId, positionId, fee);
+        quoteTokens[token] = quoteToken;
         emit TokenCreated(
             token, msg.sender, name, symbol, address(0), meta.imageURI, meta.website, meta.twitter, meta.telegram
         );
-        emit V4PoolCreated(token, poolId, fee, tickSpacing, positionId);
+        emit V4PoolCreated(token, poolId, quoteToken, fee, tickSpacing, positionId);
 
         // Optional dev buy: only runs if the creator sent ETH. Never blocks
         // the launch itself.

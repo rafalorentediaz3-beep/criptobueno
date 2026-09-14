@@ -11,7 +11,6 @@ import { SITE_URL } from "@/lib/config";
 import { usePad, useTx } from "@/lib/hooks";
 import { useAncientTokens } from "@/lib/ancient";
 import { DESCRIPTION_MAX, tokenDescriptionHash } from "@/lib/feedback/message";
-import { tokenPairingHash } from "@/lib/feedback/message";
 import { signAction } from "@/lib/feedback/sign";
 import { formatEth, normalizeSocialUrl, resolveImageUri, tryParseEther } from "@/lib/format";
 import type { RobinhoodStock } from "@/lib/stocks";
@@ -250,6 +249,7 @@ export default function CreatePage() {
     devBuyWei > 0n &&
     !isV4 &&
     (maxDevBuyWei === undefined || devBuyWei > maxDevBuyWei);
+  const stockDevBuyUnsupported = !!pairedStock && devBuyWei !== undefined && devBuyWei > 0n;
 
   // Anti-vampire shield: block names/tickers of every curated ancient (matches the
   // on-chain seed) plus a few blue-chips, so copycats can't vamp the originals.
@@ -274,6 +274,7 @@ export default function CreatePage() {
     !vampBlocked &&
     devBuyWei !== undefined &&
     !devBuyTooLarge &&
+    !stockDevBuyUnsupported &&
     (isV4 ? canV4Launch : canLaunch);
 
   useEffect(() => {
@@ -331,41 +332,6 @@ export default function CreatePage() {
         }
       })();
     }
-    if (launchedToken && pairedStock && userAddress) {
-      const tokenAddr = launchedToken;
-      void (async () => {
-        try {
-          const subject = tokenPairingHash({
-            token: tokenAddr,
-            symbol: pairedStock.symbol,
-            name: pairedStock.name,
-            imageUrl: pairedStock.imageUrl,
-          });
-          const { nonce, issuedAt, signature } = await signAction(
-            userAddress,
-            "token-pairing",
-            subject,
-            (message) => signMessageAsync({ message }),
-          );
-          await fetch("/api/token-pairing", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              address: userAddress,
-              token: tokenAddr,
-              symbol: pairedStock.symbol,
-              name: pairedStock.name,
-              imageUrl: pairedStock.imageUrl,
-              nonce,
-              issuedAt,
-              signature,
-            }),
-          });
-        } catch {
-          // Pairing is metadata only and never invalidates a successful launch.
-        }
-      })();
-    }
     // Kick the Discover/profile feed so "My profile" / planter pages pick up the
     // new plant sooner (server cache may still lag one TTL).
     void queryClient.invalidateQueries({ queryKey: ["launch-activity"] });
@@ -373,7 +339,7 @@ export default function CreatePage() {
     // navigate; the save continues even after the redirect either way.
     const timer = setTimeout(() => router.push(target), trimmedDesc ? 2500 : 800);
     return () => clearTimeout(timer);
-    // description/pairing/userAddress/signMessageAsync are read once at confirmation;
+    // description/userAddress/signMessageAsync are read once at confirmation;
     // intentionally not deps so a later keystroke can't re-fire the save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx.confirmed, tx.receipt, router, queryClient]);
@@ -393,6 +359,8 @@ export default function CreatePage() {
         showLaunchWarning("Add a token image before launching.");
       } else if (devBuyWei === undefined || devBuyTooLarge) {
         showLaunchWarning("Adjust the dev buy amount before launching.");
+      } else if (stockDevBuyUnsupported) {
+        showLaunchWarning("Stock-paired launches must start without an ETH dev buy.");
       } else {
         showLaunchWarning("Complete the required fields before launching.");
       }
@@ -439,27 +407,47 @@ export default function CreatePage() {
     if (isV4) {
       let gas: bigint | undefined;
       try {
-        const simulation = await publicClient?.simulateContract({
-          address: v4Pad,
-          abi: potatoV4PadAbi,
-          functionName: "createToken",
-          args: [trimmedName, ticker, meta, salt, v4Fee],
-          account: userAddress,
-          value: devBuyWei,
-        });
+        const simulation = pairedStock
+          ? await publicClient?.simulateContract({
+              address: v4Pad,
+              abi: potatoV4PadAbi,
+              functionName: "createPairedToken",
+              args: [trimmedName, ticker, meta, salt, pairedStock.address, v4Fee],
+              account: userAddress,
+              value: 0n,
+            })
+          : await publicClient?.simulateContract({
+              address: v4Pad,
+              abi: potatoV4PadAbi,
+              functionName: "createToken",
+              args: [trimmedName, ticker, meta, salt, v4Fee],
+              account: userAddress,
+              value: devBuyWei,
+            });
         if (simulation?.request.gas) gas = (simulation.request.gas * 12n) / 10n;
       } catch (error) {
         showLaunchWarning(`Launch simulation failed: ${launchSimulationError(error)}`);
         return;
       }
-      tx.writeContract({
-        address: v4Pad,
-        abi: potatoV4PadAbi,
-        functionName: "createToken",
-        args: [trimmedName, ticker, meta, salt, v4Fee],
-        value: devBuyWei,
-        ...(gas ? { gas } : {}),
-      });
+      if (pairedStock) {
+        tx.writeContract({
+          address: v4Pad,
+          abi: potatoV4PadAbi,
+          functionName: "createPairedToken",
+          args: [trimmedName, ticker, meta, salt, pairedStock.address, v4Fee],
+          value: 0n,
+          ...(gas ? { gas } : {}),
+        });
+      } else {
+        tx.writeContract({
+          address: v4Pad,
+          abi: potatoV4PadAbi,
+          functionName: "createToken",
+          args: [trimmedName, ticker, meta, salt, v4Fee],
+          value: devBuyWei,
+          ...(gas ? { gas } : {}),
+        });
+      }
       return;
     }
 
@@ -619,8 +607,11 @@ export default function CreatePage() {
 
               <div className="space-y-2">
                 <label htmlFor="paired-stock" className={labelCls}>
-                  Pair with
+                  Pair asset
                 </label>
+                <p className="text-[11px] leading-relaxed text-neutral-500">
+                  Optional. The token will trade directly against the selected tokenized stock and creator fees will be paid in it.
+                </p>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                   <input
@@ -669,6 +660,7 @@ export default function CreatePage() {
                           onClick={() => {
                             setPairedStock(stock);
                             setStockQuery("");
+                            setDevBuy("");
                           }}
                           className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-white/85 hover:shadow-sm"
                         >
@@ -762,10 +754,11 @@ export default function CreatePage() {
                   <input
                     id="devbuy"
                     className={`${inputCls} pr-12 font-mono tabular-nums`}
-                    placeholder="0.00"
+                    placeholder={pairedStock ? "Unavailable for stock pairs" : "0.00"}
                     inputMode="decimal"
                     value={devBuy}
                     onChange={(e) => setDevBuy(e.target.value)}
+                    disabled={!!pairedStock}
                   />
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-medium text-neutral-400">
                     ETH
@@ -801,13 +794,13 @@ export default function CreatePage() {
                       id="v4fee"
                       className={inputCls}
                       value={v4Fee}
-                      onChange={(e) => setV4Fee(Number(e.target.value))}
+                      onChange={(event) => setV4Fee(Number(event.target.value))}
                     >
-                      <option value={10000}>1%</option>
-                      <option value={20000}>2%</option>
+                      <option value={10_000}>1%</option>
+                      <option value={20_000}>2%</option>
                     </select>
                     <p className="text-[10px] leading-relaxed text-neutral-500">
-                      Fixed after launch.
+                      Fixed after launch. Stock-paired fees split 30% protocol / 70% creator in the paired asset.
                     </p>
                   </div>
                 )}
