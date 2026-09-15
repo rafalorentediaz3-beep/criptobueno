@@ -19,7 +19,7 @@ export function Footer() {
         {/* Attribution required by the project license — keep this credit visible. */}
         <div className="flex items-center gap-4">
           <a
-            href="https://x.com/onchainscam"
+            href="https://x.com/nassdaqdotlol"
             target="_blank"
             rel="noreferrer noopener"
             aria-label="Follow on X"
