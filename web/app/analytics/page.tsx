@@ -74,7 +74,7 @@ export default function AnalyticsPage() {
   const metrics: Metric[] = [
     {
       label: "Tokens launched",
-      value: data ? fmtNum(data.tokensLaunched) : "0",
+      value: "0",
       hint: data ? `${fmtNum(data.activeTokens)} active in the last 24h` : "Since launch",
       accent: "bg-gradient-to-r from-amber-400/70 to-transparent",
     },
