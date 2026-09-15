@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { PROOF_OF_POTATO_URL } from "@/lib/config";
 
 export function Footer() {
   return (
@@ -31,12 +30,12 @@ export function Footer() {
             </svg>
           </a>
           <a
-            href={PROOF_OF_POTATO_URL}
+            href="https://nassdaq.lol"
             target="_blank"
             rel="noreferrer"
             className="font-medium text-amber-500/80 transition-colors hover:text-amber-400"
           >
-            
+            nassdaq.lol
           </a>
         </div>
       </div>
