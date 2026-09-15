@@ -118,7 +118,7 @@ export function HolderRewardsCard({
           : "Nothing to claim yet";
 
   return (
-    <div className="card p-5">
+    <div className="token-glass p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
         <Coins className="h-4 w-4 text-emerald-500" />
         Holder rewards
@@ -184,7 +184,7 @@ export function HolderRewardsCard({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-2.5">
+    <div className="token-glass-inset rounded-lg border p-2.5">
       <dt className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
         {label}
       </dt>

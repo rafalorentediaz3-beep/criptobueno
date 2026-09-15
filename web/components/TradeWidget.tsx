@@ -237,7 +237,7 @@ export function TradeWidget({
   // ---- Fallback: no in-app router on this chain -> Uniswap link -------------
   if (!inApp) {
     return (
-      <div className="card p-5">
+      <div className="token-glass p-5">
         <h3 className="flex items-center gap-2 font-bold text-neutral-100">
           <TrendingUp className="h-4 w-4 text-amber-500" />
           Trade
@@ -418,7 +418,7 @@ export function TradeWidget({
   const noQuote = hasAmount && !quoting && amountOut === 0n && !exceedsBalance;
 
   return (
-    <div className="card p-5">
+    <div className="token-glass p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
         <TrendingUp className="h-4 w-4 text-amber-500" />
         Trade
@@ -426,7 +426,7 @@ export function TradeWidget({
 
       <ConnectGate>
         {/* Buy / Sell segmented toggle */}
-        <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg border border-neutral-800 bg-neutral-950 p-1">
+        <div className="token-glass-inset mt-4 grid grid-cols-2 gap-1 rounded-lg border p-1">
           <button
             type="button"
             onClick={() => {
@@ -547,7 +547,7 @@ export function TradeWidget({
         </div>
 
         {/* quote */}
-        <dl className="mt-4 space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm">
+        <dl className="token-glass-inset mt-4 space-y-1.5 rounded-lg border p-3 text-sm">
           <div className="flex justify-between">
             <dt className="text-neutral-500">You receive ≈</dt>
             <dd className="font-mono text-neutral-100">

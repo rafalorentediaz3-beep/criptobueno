@@ -7,10 +7,12 @@ import { usePublicClient } from "wagmi";
 import { usePad } from "@/lib/hooks";
 import {
   GECKOTERMINAL_NETWORKS,
+  WETH_ADDRESSES,
   ZERO_ADDRESS,
   geckoTerminalPoolUrl,
   uniswapSwapUrl,
 } from "@/lib/config";
+import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 import { bpsToPercent, formatUsd } from "@/lib/format";
 import { useGeckoIndexed } from "@/lib/useGeckoIndexed";
 import { useEthUsdPrice } from "@/lib/price";
@@ -65,7 +67,8 @@ export function TokenChart({
   startBlock?: bigint;
   imageURI?: string;
 }) {
-  const { chainId, weth } = usePad();
+  const { chainId, weth: connectedWeth } = usePad();
+  const weth = isV4 ? WETH_ADDRESSES[ANALYTICS_CHAIN_ID] ?? connectedWeth : connectedWeth;
   const client = usePublicClient();
   const [interval, setIntervalOption] = useState<"Total" | "5m" | "15m" | "1H" | "1D" | "1W">("Total");
   // How often the chart re-polls the chain for new swaps — selectable like
@@ -274,7 +277,7 @@ export function TokenChart({
   const displayTs = hoverCandle ? hoverTs : v4HistoryQuery.data?.latestTs;
 
   return (
-    <section className="card p-4 sm:p-5">
+    <section className="token-glass p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-200">
           <CandlestickChart className="h-4 w-4 text-amber-400" />
@@ -395,7 +398,7 @@ export function TokenChart({
                   </svg>
                   {lastPoint && (
                   <div
-                    className="token-chart-live-marker pointer-events-none absolute z-20 h-[11px] w-[11px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-950 p-px"
+                    className="token-chart-live-marker pointer-events-none absolute z-20 h-[15px] w-[15px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-950 p-px"
                     style={{ left: `${lastPoint.x}%`, top: `${lastPoint.y}%` }}
                     aria-hidden
                   >

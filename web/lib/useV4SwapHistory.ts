@@ -6,7 +6,8 @@ import type { Address, Hex, Log } from "viem";
 import { usePublicClient } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import { usePad } from "@/lib/hooks";
-import { ZERO_ADDRESS, V4_POOL_MANAGER_ADDRESSES } from "@/lib/config";
+import { V4_POOL_MANAGER_ADDRESSES, WETH_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
+import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 import { priceWethPerToken, tokenIsToken0 } from "@/lib/pool";
 
 const v4SwapEvent = parseAbiItem(
@@ -43,7 +44,9 @@ export function useV4SwapHistory(
   fromBlockHint?: bigint,
   quoteToken?: Address,
 ) {
-  const { chainId, weth } = usePad();
+  const { chainId: connectedChainId, weth: connectedWeth } = usePad();
+  const chainId = poolId ? ANALYTICS_CHAIN_ID : connectedChainId;
+  const weth = WETH_ADDRESSES[chainId] ?? connectedWeth;
   const quote = quoteToken ?? weth;
   const client = usePublicClient();
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;

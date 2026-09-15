@@ -15,7 +15,13 @@ import {
   potatoV4FeeLockerAbi,
   potatoV4PadAbi,
 } from "@/lib/abi";
-import { CURVE_PAD_ADDRESSES, V4_POOL_MANAGER_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
+import {
+  CURVE_PAD_ADDRESSES,
+  V4_POOL_MANAGER_ADDRESSES,
+  WETH_ADDRESSES,
+  ZERO_ADDRESS,
+} from "@/lib/config";
+import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 import { usePad } from "@/lib/hooks";
 
 /** Fixed launch supply: 1 billion whole tokens (18 decimals). */
@@ -311,10 +317,12 @@ export function priceWethPerToken(sqrtPriceX96: bigint, isToken0: boolean): numb
 export interface PoolStats {
   /** raw pool price */
   sqrtPriceX96: bigint | undefined;
-  /** WETH per whole token (float), 0 when unknown */
+  /** Quote-token units per whole token (float), 0 when unknown. */
   priceWeth: number;
-  /** fully-diluted valuation in ETH = priceWeth * 1e9 supply */
+  /** fully-diluted valuation in ETH; zero for non-WETH pairs. */
   marketCapEth: number;
+  /** fully-diluted valuation in the pool's quote token. */
+  marketCapQuote: number;
   /** Uniswap concentrated-liquidity L value */
   liquidity: bigint | undefined;
   /** WETH held by the pool — a rough TVL proxy */
@@ -327,6 +335,7 @@ const ZERO_STATS: PoolStats = {
   sqrtPriceX96: undefined,
   priceWeth: 0,
   marketCapEth: 0,
+  marketCapQuote: 0,
   liquidity: undefined,
   wethInPool: undefined,
   isLoading: false,
@@ -344,9 +353,13 @@ export function usePoolStats(
   v4PoolId?: Hex,
   quoteToken?: Address,
 ): PoolStats {
-  const { weth } = usePad();
+  const { weth: connectedWeth } = usePad();
+  const connectedChainId = useChainId();
+  // V4 analytics are pinned to Robinhood even when the wallet is disconnected
+  // or temporarily switched to another network.
+  const chainId = v4PoolId ? ANALYTICS_CHAIN_ID : connectedChainId;
+  const weth = WETH_ADDRESSES[chainId] ?? connectedWeth;
   const quote = quoteToken ?? weth;
-  const chainId = useChainId();
   const v4Manager = V4_POOL_MANAGER_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const isV4 = !!v4PoolId && v4Manager !== ZERO_ADDRESS;
   const v4StateSlot = v4PoolId ? v4PoolStateSlot(v4PoolId) : undefined;
@@ -358,12 +371,14 @@ export function usePoolStats(
     allowFailure: true,
     contracts: [
       isV4
-        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [v4StateSlot!] }
+        ? { chainId: ANALYTICS_CHAIN_ID, address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [v4StateSlot!] }
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "slot0" },
       isV4
-        ? { address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [addSlot(v4StateSlot!, V4_LIQUIDITY_OFFSET)] }
+        ? { chainId: ANALYTICS_CHAIN_ID, address: v4Manager, abi: uniswapV4PoolManagerAbi, functionName: "extsload", args: [addSlot(v4StateSlot!, V4_LIQUIDITY_OFFSET)] }
         : { address: pool, abi: uniswapV3PoolAbi, functionName: "liquidity" },
-      { address: quote, abi: erc20BalanceAbi, functionName: "balanceOf", args: [isV4 ? v4Manager : pool ?? quote] },
+      isV4
+        ? { chainId: ANALYTICS_CHAIN_ID, address: quote, abi: erc20BalanceAbi, functionName: "balanceOf", args: [v4Manager] }
+        : { address: quote, abi: erc20BalanceAbi, functionName: "balanceOf", args: [pool ?? quote] },
     ],
     query: { enabled, staleTime: 15_000, refetchInterval: 30_000 },
   });
@@ -398,6 +413,7 @@ export function usePoolStats(
       sqrtPriceX96: effectiveSqrtPrice,
       priceWeth,
       marketCapEth: isWethQuote ? priceWeth * TOTAL_SUPPLY_WHOLE : 0,
+      marketCapQuote: priceWeth * TOTAL_SUPPLY_WHOLE,
       liquidity,
       wethInPool,
       isLoading: false,

@@ -423,9 +423,12 @@ export default function CreatePage() {
         }
       })();
     }
-    // Kick the Discover/profile feed so "My profile" / planter pages pick up the
-    // new plant sooner (server cache may still lag one TTL).
-    void queryClient.invalidateQueries({ queryKey: ["launch-activity"] });
+    // Force the server feed to include this launch before invalidating any open
+    // Discover observers; a normal invalidation can briefly receive the old
+    // server snapshot while its background scan is still running.
+    void fetch("/api/tokens?refresh=1", { cache: "no-store" }).finally(() => {
+      void queryClient.invalidateQueries({ queryKey: ["launch-activity"] });
+    });
     // Give the optional description-signature prompt room to appear before we
     // navigate; the save continues even after the redirect either way.
     const timer = setTimeout(() => router.push(target), trimmedDesc ? 2500 : 800);
@@ -593,7 +596,7 @@ export default function CreatePage() {
   const submitLabel = tx.isPending
     ? "Confirm in wallet…"
     : tx.isConfirming
-      ? "Planting…"
+      ? "Creating"
       : tx.confirmed
         ? "Planted"
         : vampBlocked
@@ -698,11 +701,8 @@ export default function CreatePage() {
 
               <div className="space-y-2">
                 <label htmlFor="paired-stock" className={labelCls}>
-                  Pair asset
+                  Pair asset <span className="font-normal text-neutral-500">(Optional)</span>
                 </label>
-                <p className="text-[11px] leading-relaxed text-neutral-500">
-                  Optional. Pair with any 18-decimal Robinhood Chain token. Unlisted tokens use the pad&apos;s standard opening FDV, denominated in that token.
-                </p>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                   <input
@@ -1082,7 +1082,7 @@ export default function CreatePage() {
                 </div>
               </div>
             </div>
-            <TxStatus tx={tx} chainId={chainId} successLabel="Token planted, taking you to its page…" />
+            <TxStatus tx={tx} chainId={chainId} successLabel="Token launched" successTone="gold" />
           </div>
           </div>
         </div>

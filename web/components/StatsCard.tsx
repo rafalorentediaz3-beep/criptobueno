@@ -7,12 +7,22 @@ import { bpsToPercent, formatUsd } from "@/lib/format";
 import { useEthUsdPrice } from "@/lib/price";
 import { usePoolVolume24h } from "@/lib/volume";
 
+function formatCompactMarketCap(value: number): string {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
+  return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
 export function StatsCard({
   token,
   pool,
   chainId,
   marketCapEth,
   marketCapUsd: initialMarketCapUsd,
+  marketCapQuote: initialMarketCapQuote,
+  quoteSymbol,
+  preferQuoteMarketCap = false,
   onCurve = false,
   progressBps = 0n,
   volume24Usd: initialVolume24Usd,
@@ -29,6 +39,12 @@ export function StatsCard({
   marketCapEth: number;
   /** Quote-aware USD valuation supplied by the launch feed. */
   marketCapUsd?: number;
+  /** Live fully-diluted valuation in the pool's quote asset. */
+  marketCapQuote?: number;
+  /** Ticker used when the pair is not WETH. */
+  quoteSymbol?: string;
+  /** Use quote units when the paired asset has no reliable USD price. */
+  preferQuoteMarketCap?: boolean;
   /** True while the token is in the pre-migration bonding-curve phase. */
   onCurve?: boolean;
   /** Curve progress toward the fill/migration price, 0–10000 bps (only when onCurve). */
@@ -58,17 +74,23 @@ export function StatsCard({
       : ethUsd !== null && marketCapEth > 0
         ? marketCapEth * ethUsd
         : null;
+  const marketCapQuote =
+    initialMarketCapQuote != null && initialMarketCapQuote > 0 ? initialMarketCapQuote : null;
 
   const rows: Array<{ label: string; value: string; sub?: string }> = [
     {
       label: "Market Cap",
       // USD headline; fall back to the ETH-denominated FDV if the feed is down.
       value:
-        marketCapUsd !== null
-          ? formatUsd(marketCapUsd)
-          : marketCapEth <= 0
-            ? "…"
-            : `${marketCapEth.toLocaleString("en-US", { maximumFractionDigits: 2 })} ETH`,
+        preferQuoteMarketCap && marketCapQuote !== null
+          ? `${formatCompactMarketCap(marketCapQuote)} MC`
+          : marketCapUsd !== null
+            ? formatUsd(marketCapUsd)
+            : marketCapQuote !== null
+            ? `${formatCompactMarketCap(marketCapQuote)} MC`
+            : marketCapEth <= 0
+              ? "…"
+              : `${marketCapEth.toLocaleString("en-US", { maximumFractionDigits: 2 })} ETH`,
     },
     {
       label: "Volume 24h",
@@ -83,7 +105,7 @@ export function StatsCard({
   // Horizontal strip (exchange-style): one row of stats above the chart.
   if (variant === "strip") {
     return (
-      <div className="card grid grid-cols-3 sm:divide-x sm:divide-neutral-800/70">
+      <div className="token-glass grid grid-cols-3 sm:divide-x sm:divide-white/10">
         {rows.map((row) => (
           <div key={row.label} className="px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
@@ -102,7 +124,7 @@ export function StatsCard({
   }
 
   return (
-    <div className="card p-5">
+    <div className="token-glass p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
         <Activity className="h-4 w-4 text-amber-500" />
         Stats
@@ -111,7 +133,7 @@ export function StatsCard({
         {rows.map((row) => (
           <div
             key={row.label}
-            className="rounded-lg border border-neutral-800 bg-neutral-950 p-2.5"
+            className="token-glass-inset rounded-lg border p-2.5"
           >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               {row.label}

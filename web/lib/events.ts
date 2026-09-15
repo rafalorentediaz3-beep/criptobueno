@@ -135,6 +135,57 @@ const EMPTY_LAUNCH: LaunchActivity = {
   unavailable: true,
 };
 
+type LiveLaunchLog = {
+  blockNumber?: bigint | null;
+  args?: Partial<CreationEvent>;
+};
+
+function refreshLaunchFeed(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  logs: readonly LiveLaunchLog[],
+  pad: Address,
+  kind: PadKind,
+) {
+  const liveCreations = logs.flatMap((log) => {
+    const args = log.args;
+    if (!args?.token || !args.creator || !args.name || !args.symbol) return [];
+    return [{
+      token: args.token,
+      creator: args.creator,
+      name: args.name,
+      symbol: args.symbol,
+      pool: args.pool ?? ZERO_ADDRESS,
+      imageURI: args.imageURI ?? "",
+      website: args.website ?? "",
+      twitter: args.twitter ?? "",
+      telegram: args.telegram ?? "",
+      timestamp: Math.floor(Date.now() / 1000),
+      blockNumber: log.blockNumber ?? 0n,
+      pad,
+      volume24Usd: 0,
+      marketCapUsd: 0,
+      marketCapEth: 0,
+      kind,
+    } satisfies CreationEvent];
+  });
+  if (liveCreations.length > 0) {
+    queryClient.setQueryData<LaunchActivity>(queryKey, (current) => {
+      if (!current) return current;
+      const existing = new Set(current.creations.map((creation) => creation.token.toLowerCase()));
+      const additions = liveCreations.filter((creation) => !existing.has(creation.token.toLowerCase()));
+      return additions.length > 0
+        ? { ...current, creations: [...additions, ...current.creations], state: "fresh", unavailable: false }
+        : current;
+    });
+  }
+  // Refresh in the background so the optimistic row receives its pool, quote,
+  // price and volume enrichment without delaying its first appearance.
+  void fetch("/api/tokens?refresh=1", { cache: "no-store" }).finally(() => {
+    void queryClient.invalidateQueries({ queryKey });
+  });
+}
+
 /**
  * PotatoPad launch feed — always Robinhood (4663) server scan, independent of
  * the connected wallet chain. Discover, ticker, and creator profiles share this.
@@ -280,21 +331,21 @@ export function useLaunchActivity({
     abi: potatoCurvePadAbi,
     eventName: "TokenCreated",
     enabled: live && curvePad !== ZERO_ADDRESS,
-    onLogs: () => queryClient.invalidateQueries({ queryKey }),
+    onLogs: (logs) => refreshLaunchFeed(queryClient, queryKey, logs, curvePad, "curve"),
   });
   useWatchContractEvent({
     address: directPad,
     abi: potatoPadAbi,
     eventName: "TokenCreated",
     enabled: live && directPad !== ZERO_ADDRESS,
-    onLogs: () => queryClient.invalidateQueries({ queryKey }),
+    onLogs: (logs) => refreshLaunchFeed(queryClient, queryKey, logs, directPad, "direct"),
   });
   useWatchContractEvent({
     address: v4Pad,
     abi: potatoV4PadAbi,
     eventName: "TokenCreated",
     enabled: live && v4Pad !== ZERO_ADDRESS,
-    onLogs: () => queryClient.invalidateQueries({ queryKey }),
+    onLogs: (logs) => refreshLaunchFeed(queryClient, queryKey, logs, v4Pad, "v4"),
   });
 
   const raw = query.data ?? EMPTY_LAUNCH;

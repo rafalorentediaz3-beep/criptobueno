@@ -70,7 +70,7 @@ export function TokenTraders({
   }
 
   return (
-    <div className="card p-5">
+    <div className="token-glass p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 rounded-full bg-neutral-900 p-0.5">
           {isV4 && (

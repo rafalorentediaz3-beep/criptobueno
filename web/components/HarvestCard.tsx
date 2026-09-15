@@ -413,7 +413,7 @@ export function HarvestCard({
     isV4 || pad.toLowerCase() === (PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS).toLowerCase();
 
   return (
-    <div className="card p-5">
+    <div className="token-glass p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
         <Leaf className="h-4 w-4 text-amber-500" />
         Creator fees
@@ -424,7 +424,7 @@ export function HarvestCard({
           : "Your 50% of WETH swap fees. Principal is locked forever and unruggable."}
       </p>
 
-      <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+      <div className="token-glass-inset mt-4 rounded-lg border p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-neutral-500">

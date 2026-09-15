@@ -82,8 +82,9 @@ export function TokenHeaderCard({
 
   return (
     <>
-      <div className="card p-5">
-        <div className="flex flex-wrap items-start gap-4">
+      <div className="token-glass relative overflow-hidden p-5 sm:p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.10),transparent_34%,rgba(245,183,40,0.05))]" />
+        <div className="relative z-10 flex flex-wrap items-start gap-4">
           {zoomCandidates.length > 0 ? (
             <button
               type="button"
@@ -111,7 +112,7 @@ export function TokenHeaderCard({
                 </span>
               )}
               {pairedStock && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/30 bg-lime-400/10 px-2 py-0.5 text-xs font-semibold text-lime-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/45 bg-amber-400/15 px-2.5 py-1 text-xs font-semibold text-amber-200 shadow-[0_0_18px_-8px_rgba(245,183,40,0.95),inset_0_1px_0_rgba(255,248,190,0.24)] backdrop-blur-md">
                   <img src={pairedStock.imageUrl} alt="" className="h-4 w-4 rounded-full object-contain" />
                   Paired to ${pairedStock.symbol}
                 </span>

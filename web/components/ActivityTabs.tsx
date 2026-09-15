@@ -33,7 +33,7 @@ export function ActivityTabs({
   }
 
   return (
-    <div className="card p-5">
+    <div className="token-glass p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
         <Users className="h-4 w-4 text-amber-500" />
         Holders

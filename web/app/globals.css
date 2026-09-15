@@ -32,6 +32,14 @@
     @apply rounded-2xl border border-neutral-800 bg-neutral-900;
   }
 
+  .token-glass {
+    @apply rounded-[24px] border border-white/15 bg-neutral-950/55 shadow-[0_22px_60px_-30px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-2xl backdrop-saturate-150;
+  }
+
+  .token-glass-inset {
+    @apply border-white/10 bg-white/[0.045] backdrop-blur-xl;
+  }
+
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -273,28 +281,27 @@
   }
 }
 
-/* Brief live-price pulse on the token marker, repeated every three minutes. */
+/* Soft price-marker pulse keeps the current point visible without moving it. */
 .token-chart-live-marker {
   box-shadow:
     0 0 0 1px rgba(251, 191, 36, 0.95),
     0 0 10px rgba(245, 158, 11, 0.65);
-  animation: token-price-refresh 180s ease-in-out infinite;
+  animation: token-price-pulse 2s ease-in-out infinite;
 }
 
-@keyframes token-price-refresh {
+@keyframes token-price-pulse {
   0%,
-  1.5%,
   100% {
     opacity: 1;
     box-shadow:
       0 0 0 1px rgba(251, 191, 36, 0.95),
       0 0 10px rgba(245, 158, 11, 0.65);
   }
-  0.75% {
-    opacity: 0.72;
+  50% {
+    opacity: 0.94;
     box-shadow:
-      0 0 0 2px rgba(251, 191, 36, 0.45),
-      0 0 16px rgba(245, 158, 11, 0.9);
+      0 0 0 4px rgba(251, 191, 36, 0.42),
+      0 0 22px rgba(245, 158, 11, 0.95);
   }
 }
 

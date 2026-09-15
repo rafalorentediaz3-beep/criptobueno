@@ -21,6 +21,7 @@ import {
   allPadDeployments,
   isMigrated,
 } from "@/lib/config";
+import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 import { wagmiConfig } from "@/lib/wagmi";
 
 /**
@@ -287,7 +288,9 @@ export interface TokenPadHint {
  * pad (unresolved) while loading or if nothing matches.
  */
 export function useTokenPad(token: Address | undefined, hint?: TokenPadHint): ResolvedToken {
-  const chainId = useChainId();
+  // Token detail pages and their feed are Robinhood-only. Resolve against that
+  // deployment even when the wallet is disconnected or on another chain.
+  const chainId = ANALYTICS_CHAIN_ID;
   const pads = useMemo(() => allPadDeployments(chainId), [chainId]);
   const curvePad = CURVE_PAD_ADDRESSES[chainId] ?? ZERO_ADDRESS;
   const completeHint =

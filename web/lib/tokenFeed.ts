@@ -29,6 +29,7 @@ const SCAN_CONCURRENCY = 3; // Robinhood's public RPC rate-limits bursty getLogs
 // the chain shortly after a launch, while in-flight coalescing still prevents
 // every browser from starting its own RPC scan.
 const CACHE_TTL_MS = 30_000;
+const RECENT_REFRESH_BLOCKS = 18_000n;
 const CHUNK_RETRIES = 3; // a window survives transient RPC blips instead of aborting the scan.
 // If more than this fraction of a pad's windows never succeed, the scan is too
 // incomplete to trust — flag `unavailable` so the client retries (vs. caching a
@@ -334,7 +335,7 @@ async function fetchMarketSnapshots(
 // once and kept for the process lifetime; only the active pad is re-scanned.
 let legacyTagged: PadTag[] | null = null;
 
-async function scan(): Promise<FeedPayload> {
+async function scan(recentOnly = false): Promise<FeedPayload> {
   // Kind-tagged: the curve pad AND the direct pads, so a token resolves to the
   // right launcher and the feed can tell the UI which stage to render.
   const pads = allPadDeployments(robinhoodChain.id);
@@ -342,6 +343,7 @@ async function scan(): Promise<FeedPayload> {
   if (pads.length === 0) return stamp([], "fresh", Date.now());
 
   const latest = await client.getBlockNumber();
+  const previousCreations = cache?.creations ?? [];
   // The active (write) pad has no endBlock; legacy pads carry the repoint block.
   const legacyPads = pads.filter((p) => p.endBlock !== undefined);
   const activePads = pads.filter((p) => p.endBlock === undefined);
@@ -360,9 +362,15 @@ async function scan(): Promise<FeedPayload> {
     const priorityPads = activePads.filter((p) => p.kind === "v4");
     const fallbackPads = activePads.filter((p) => p.kind !== "v4");
     const activeResults = await Promise.all(
-      (priorityPads.length > 0 ? priorityPads : fallbackPads).map((p) =>
-        scanPadRange(p.address, p.startBlock, latest),
-      ),
+      (priorityPads.length > 0 ? priorityPads : fallbackPads).map((p) => {
+        const recentStart = latest > RECENT_REFRESH_BLOCKS ? latest - RECENT_REFRESH_BLOCKS : 0n;
+        const fromBlock = recentOnly
+          ? p.startBlock > recentStart
+            ? p.startBlock
+            : recentStart
+          : p.startBlock;
+        return scanPadRange(p.address, fromBlock, latest);
+      }),
     );
     let failed = 0;
     let total = 0;
@@ -379,6 +387,10 @@ async function scan(): Promise<FeedPayload> {
   let legacyRound: PadTag[];
   if (legacyTagged !== null) {
     legacyRound = legacyTagged;
+  } else if (recentOnly && previousCreations.length > 0) {
+    // The warm cache already contains the immutable legacy history. A recent
+    // refresh only needs to discover new launches on the active pad.
+    legacyRound = [];
   } else {
     // Keep the previous V4 history (a small range) discoverable, but avoid
     // blocking cold requests on the much larger legacy direct-pad history.
@@ -483,16 +495,21 @@ async function scan(): Promise<FeedPayload> {
   }
   // A partial scan (some window failed) surfaces as "unavailable" so the client
   // shows a warm cache rather than treating a truncated list as complete.
-  return stamp(creations, unavailable ? "unavailable" : "fresh", Date.now());
+  const mergedCreations = recentOnly && previousCreations.length > 0
+    ? [...previousCreations, ...creations.filter((fresh) =>
+        !previousCreations.some((previous) => previous.token.toLowerCase() === fresh.token.toLowerCase()),
+      )]
+    : creations;
+  return stamp(mergedCreations, unavailable ? "unavailable" : "fresh", Date.now());
 }
 
 let inFlight: Promise<FeedPayload> | null = null;
 
-function refreshFeed(): Promise<FeedPayload> {
+function refreshFeed(recentOnly = false): Promise<FeedPayload> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     try {
-      const result = await scan();
+      const result = await scan(recentOnly);
       // Gappy scans: soft-degrade. Prefer warm cache as "stale" over a partial list.
       if (result.unavailable) {
         if (cache) return stamp(cache.creations, "stale", cache.scanCompletedAt);
@@ -524,17 +541,19 @@ function refreshFeed(): Promise<FeedPayload> {
  * Soft-degrades to stale/unavailable without throwing. Concurrent cold-cache
  * callers share ONE scan (in-flight coalescing).
  */
-export async function loadFeed(): Promise<FeedPayload> {
+export async function loadFeed(options?: { force?: boolean }): Promise<FeedPayload> {
+  const force = options?.force === true;
   const now = Date.now();
-  if (cache && cache.expiresAt > now) {
+  if (!force && cache && cache.expiresAt > now) {
     return stamp(cache.creations, cache.state, cache.scanCompletedAt);
   }
   // Once warmed, never make a visitor wait for the full chain scan. Serve the
   // last trustworthy snapshot immediately and refresh it in the background.
-  if (cache) {
+  if (!force && cache) {
     void refreshFeed();
     return stamp(cache.creations, "stale", cache.scanCompletedAt);
   }
+  if (force && cache) return refreshFeed(true);
   // Cold failure backoff: avoid hammering RPC with full multi-pad scans.
   if (now < unavailableUntil) {
     return stamp([], "unavailable", 0);

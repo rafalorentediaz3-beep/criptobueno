@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { loadFeed } from "@/lib/tokenFeed";
 
 /**
@@ -16,9 +16,12 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=10, stale-while-revalidate=300",
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   // loadFeed soft-degrades on RPC failure (last good payload, or unavailable),
   // so we always return HTTP 200 and the UI degrades gracefully.
-  const payload = await loadFeed();
-  return NextResponse.json(payload, { headers: CACHE_HEADERS });
+  const force = req.nextUrl.searchParams.get("refresh") === "1";
+  const payload = await loadFeed({ force });
+  return NextResponse.json(payload, {
+    headers: force ? { "Cache-Control": "no-store" } : CACHE_HEADERS,
+  });
 }

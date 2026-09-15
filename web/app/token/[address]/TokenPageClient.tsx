@@ -7,6 +7,7 @@ import { getAddress, isAddress } from "viem";
 import { useReadContract } from "wagmi";
 import { potatoTokenAbi, potatoV4PadAbi } from "@/lib/abi";
 import { WETH_ADDRESSES, ZERO_ADDRESS } from "@/lib/config";
+import { ANALYTICS_CHAIN_ID } from "@/lib/robinhoodPublicClient";
 import { ROBINHOOD_TOKENIZED_STOCKS } from "@/lib/stocks";
 import { useAncientTokens } from "@/lib/ancient";
 import { useLaunchActivity } from "@/lib/events";
@@ -56,6 +57,7 @@ export default function TokenPageClient() {
   const isCurve = resolved.kind === "curve";
   const isV4 = resolved.kind === "v4";
   const quoteRead = useReadContract({
+    chainId: ANALYTICS_CHAIN_ID,
     address: resolved.pad,
     abi: potatoV4PadAbi,
     functionName: "quoteTokens",
@@ -63,12 +65,24 @@ export default function TokenPageClient() {
     query: { enabled: isV4 && !!token && resolved.pad !== ZERO_ADDRESS },
   });
   const storedQuote = quoteRead.data as `0x${string}` | undefined;
+  const analyticsWeth = WETH_ADDRESSES[ANALYTICS_CHAIN_ID] ?? ZERO_ADDRESS;
   const quoteToken =
     (storedQuote && storedQuote !== ZERO_ADDRESS ? storedQuote : creation?.quoteToken) ??
-    WETH_ADDRESSES[chainId];
+    (isV4 ? analyticsWeth : WETH_ADDRESSES[chainId]);
   const pairedStock = ROBINHOOD_TOKENIZED_STOCKS.find(
     (stock) => stock.address.toLowerCase() === quoteToken?.toLowerCase(),
   );
+  const quoteSymbolRead = useReadContract({
+    chainId: ANALYTICS_CHAIN_ID,
+    address: quoteToken,
+    abi: potatoTokenAbi,
+    functionName: "symbol",
+    query: {
+      enabled: isV4 && quoteToken !== ZERO_ADDRESS,
+      staleTime: 5 * 60_000,
+    },
+  });
+  const quoteSymbol = pairedStock?.symbol ?? (quoteSymbolRead.data as string | undefined)?.trim();
   // Do not issue curve-pad reads for V4/direct tokens.
   const curve = useCurveStats(isCurve ? token : undefined);
   // If no pad claims it, it may be a pre-existing "ancient" Robinhood token.
@@ -92,6 +106,7 @@ export default function TokenPageClient() {
   const knownSymbol = creation?.symbol?.trim() || ancient?.symbol?.trim();
   const needsTokenMetadata = !knownName || !knownSymbol;
   const nameRead = useReadContract({
+    chainId: isV4 ? ANALYTICS_CHAIN_ID : chainId,
     address: queryToken,
     abi: potatoTokenAbi,
     functionName: "name",
@@ -102,6 +117,7 @@ export default function TokenPageClient() {
     },
   });
   const symbolRead = useReadContract({
+    chainId: isV4 ? ANALYTICS_CHAIN_ID : chainId,
     address: queryToken,
     abi: potatoTokenAbi,
     functionName: "symbol",
@@ -128,6 +144,9 @@ export default function TokenPageClient() {
   );
   const marketCapEth =
     poolStats.marketCapEth > 0 ? poolStats.marketCapEth : (creation?.marketCapEth ?? 0);
+  const isWethQuote = quoteToken?.toLowerCase() === analyticsWeth.toLowerCase();
+  const marketCapQuote =
+    !isWethQuote && poolStats.marketCapQuote > 0 ? poolStats.marketCapQuote : undefined;
   const priceWeth =
     poolStats.priceWeth > 0
       ? poolStats.priceWeth
@@ -327,6 +346,9 @@ export default function TokenPageClient() {
           chainId={chainId}
           marketCapEth={marketCapEth}
           marketCapUsd={creation?.marketCapUsd}
+          marketCapQuote={marketCapQuote}
+          quoteSymbol={quoteSymbol}
+          preferQuoteMarketCap={!isWethQuote && !pairedStock}
           onCurve={onCurve}
           progressBps={curve.progressBps}
           volume24Usd={creation?.volume24Usd}
@@ -343,7 +365,7 @@ export default function TokenPageClient() {
           isCurve={isCurve}
           bonded={resolved.bonded}
           pairToken={quoteToken}
-          pairSymbol={pairedStock?.symbol}
+          pairSymbol={quoteSymbol}
           progressBps={curve.progressBps}
           startBlock={creation?.blockNumber}
           imageURI={creation?.imageURI}
@@ -356,7 +378,7 @@ export default function TokenPageClient() {
           symbol={symbol ?? ""}
           isV4={isV4}
           pairToken={quoteToken}
-          pairSymbol={pairedStock?.symbol}
+          pairSymbol={quoteSymbol}
           startBlock={creation?.blockNumber}
         />
       </div>
@@ -376,7 +398,7 @@ export default function TokenPageClient() {
           v4Fee={resolved.feeTier}
           bonded={resolved.bonded}
           pairToken={quoteToken}
-          pairSymbol={pairedStock?.symbol}
+          pairSymbol={quoteSymbol}
         />
         {/* Renders only for holder-rewards launches; a no-op otherwise. */}
         {!isV4 && (
@@ -391,7 +413,7 @@ export default function TokenPageClient() {
           pad={resolved.pad}
           isV4={isV4}
           pairToken={quoteToken}
-          pairSymbol={pairedStock?.symbol}
+          pairSymbol={quoteSymbol}
         />
       </div>
     </div>

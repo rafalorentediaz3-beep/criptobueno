@@ -53,7 +53,7 @@ interface CachedMarketCap {
   updatedAt: number;
 }
 
-const MARKET_CAP_CACHE_KEY = "potatopad:market-caps:v1";
+const MARKET_CAP_CACHE_KEY = "potatopad:market-caps:v2";
 const MARKET_CAP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function readMarketCapCache(): Record<string, CachedMarketCap> {
@@ -220,7 +220,7 @@ export default function DiscoverPage() {
   );
 
   // Pass 2: pool slot0 for each effective pool, index-aligned to `creations`.
-  // Priced with RH_WETH so a wallet on another chain doesn't mis-price RH pools.
+  // V4 pools are resolved separately from their PoolManager state below.
   const poolReadIndexes = useMemo(
     () =>
       effectivePools
@@ -301,25 +301,29 @@ export default function DiscoverPage() {
           sqrtPriceX96 = slot0?.[0];
         }
         const cached = cachedMarketCaps[c.token.toLowerCase()];
+        const quoteToken = c.quoteToken ?? RH_WETH;
+        const isWethQuote = quoteToken.toLowerCase() === RH_WETH.toLowerCase();
         // Failed / missing live price falls back to the last valid snapshot so
         // returning visitors never wait on the RPC before seeing an FDV.
         let priceWeth: number | null = null;
         if (sqrtPriceX96 !== undefined && sqrtPriceX96 > 0n) {
-          const p = priceWethPerToken(sqrtPriceX96, tokenIsToken0(c.token, RH_WETH));
-          priceWeth = Number.isFinite(p) && p > 0 ? p : null;
+          const priceQuote = priceWethPerToken(sqrtPriceX96, tokenIsToken0(c.token, quoteToken));
+          if (isWethQuote) priceWeth = Number.isFinite(priceQuote) && priceQuote > 0 ? priceQuote : null;
         }
         const marketCapEth =
-          priceWeth != null
+          isWethQuote && priceWeth != null
             ? priceWeth * TOTAL_SUPPLY_WHOLE
-            : c.marketCapEth > 0
+            : isWethQuote && c.marketCapEth > 0
               ? c.marketCapEth
-              : (cached?.eth ?? null);
+              : isWethQuote ? (cached?.eth ?? null) : null;
         const marketCapUsd =
-          ethUsd !== null && marketCapEth != null
-            ? marketCapEth * ethUsd
-            : c.marketCapUsd > 0
-              ? c.marketCapUsd
-              : cached?.usd;
+          c.marketCapUsd > 0
+            ? c.marketCapUsd
+            : isWethQuote && ethUsd !== null && marketCapEth != null
+              ? marketCapEth * ethUsd
+              : isWethQuote
+                ? cached?.usd
+                : undefined;
         return {
           address: c.token,
           name: c.name,

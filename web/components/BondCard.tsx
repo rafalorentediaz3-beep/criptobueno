@@ -27,7 +27,7 @@ export function BondCard({
 }) {
   const bondTx = useTx();
   return (
-    <div className="card border-amber-500/40 bg-amber-500/5 p-5">
+    <div className="token-glass border-amber-400/35 bg-amber-500/10 p-5">
       <h3 className="flex items-center gap-2 font-bold text-neutral-100">
         <Lock className="h-4 w-4 text-amber-500" />
         Ready to bond
