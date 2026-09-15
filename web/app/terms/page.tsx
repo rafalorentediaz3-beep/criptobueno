@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { PROOF_OF_POTATO_URL } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Terms & Disclaimers",
@@ -65,22 +64,6 @@ export default function TermsPage() {
           </section>
         ))}
 
-        <section>
-          <h2 className="mb-2 font-semibold text-amber-500">Attribution</h2>
-          <p className="text-sm leading-relaxed text-neutral-300">
-            This project is open-source, made by{" "}
-            <a
-              href={PROOF_OF_POTATO_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-amber-500 underline decoration-amber-500/40 underline-offset-2 hover:text-amber-400"
-            >
-              proofofpotato.com
-            </a>
-            . Forks and deployments of this code must keep this credit visible; see the
-            repository LICENSE.
-          </p>
-        </section>
       </div>
     </main>
   );
