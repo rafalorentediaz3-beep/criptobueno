@@ -361,6 +361,17 @@ export function padDeployments(chainId: number): PadDeployment[] {
  */
 const HIDDEN_TOKENS = new Set<string>([
   "0x6b1855cca09b826dd9b2b6025ef4f7447de549a5", // duplicates an Ancient entry
+  // Test launches removed from the production browse feed.
+  "0x5f803e8d2ab77f0b72da0f4ebb97d32b98e69fc9", // TEST
+  "0x86f1468b8c8e445e935468112680d850bdb3aeaa", // RG
+  "0x51979a75580c84e9a9aeaeb84fbce8aefb28cd1e", // PD
+  "0xf25939eefec3e2a7e6fd0ebb3048cb756f646be0", // NF
+  "0xe488928a3ad33a6b0c71cb7a325da8aabd50337f", // RF
+  "0xda27f5867ecfda1deaecbc1048e4410e322e661a", // ASSET
+  "0xb33374391cab1584033cadccd0db62c1c803cbbe", // ASSY
+  "0xb239ad5304e613f0c52b1d1291c2e70d951c5dd9", // HOLD
+  "0x91e337077a0cbad80c82fc521709523a1a19ecb3", // HO2
+  "0x98a318d16789302dfc288c16cf59846e2325f88d", // FCKER
 ]);
 
 export function isHiddenToken(address: string): boolean {

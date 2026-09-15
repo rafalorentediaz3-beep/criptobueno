@@ -17,6 +17,7 @@ import type { RobinhoodStock } from "@/lib/stocks";
 import { ConnectGate } from "@/components/ConnectGate";
 import { NotDeployed } from "@/components/NotDeployed";
 import { TxStatus } from "@/components/TxStatus";
+import { TokenAvatar } from "@/components/TokenAvatar";
 
 /**
  * The treasury always takes half the WETH fees; the other half is the creator's.
@@ -69,8 +70,25 @@ function launchSimulationError(error: unknown): string {
   return shortMessage || "The network rejected this launch before signing.";
 }
 
-function StockLogo({ stock }: { stock: RobinhoodStock }) {
+function StockLogo({ stock, custom = false }: { stock: RobinhoodStock; custom?: boolean }) {
   const [source, setSource] = useState(stock.imageUrl);
+  if (custom) {
+    if (!source) {
+      return (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white/70">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-400" aria-label="Loading logo" />
+        </span>
+      );
+    }
+    return (
+      <TokenAvatar
+        address={stock.address}
+        imageURI={source || undefined}
+        size="sm"
+        className="h-6 w-6 rounded-full border-0"
+      />
+    );
+  }
   return (
     source ? (
       <img
@@ -745,7 +763,11 @@ export default function CreatePage() {
                     }}
                     className="flex w-full items-center gap-3 rounded-2xl border border-lime-200 bg-lime-50/70 p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_-16px_rgba(132,204,22,0.45)] backdrop-blur-xl"
                   >
-                    <StockLogo key={`${pairedStock.address}-${pairedStock.imageUrl}`} stock={pairedStock} />
+                    <StockLogo
+                      key={`${pairedStock.address}-${pairedStock.imageUrl}`}
+                      stock={pairedStock}
+                      custom
+                    />
                     <span className="min-w-0 flex-1">
                       <strong className="block truncate text-sm text-neutral-900">{pairedStock.symbol}</strong>
                       <span className="block truncate text-xs text-neutral-500">{pairedStock.name}</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, Hourglass, Search, Sprout } from "lucide-react";
+import { Heart, Hourglass, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Address, Hex } from "viem";
@@ -589,14 +589,9 @@ export default function DiscoverPage() {
               </>
             ) : (
               <>
-                <Sprout className="mx-auto h-10 w-10 text-green-500/70" aria-hidden />
-                <h2 className="mt-4 text-lg font-bold text-neutral-100">Nothing planted yet</h2>
-                <p className="mt-2 text-sm text-neutral-500">
-                  Be the first to plant a coin. It launches straight onto Uniswap V3, live from the
-                  first block.
-                </p>
+                <h2 className="text-lg font-bold text-neutral-100">Create the first hot token</h2>
                 <Link href="/create" className="btn-primary mt-5">
-                  Plant the first coin
+                  Create token
                 </Link>
               </>
             )}

@@ -1,6 +1,5 @@
 "use client";
 
-import { Sprout } from "lucide-react";
 import { useMemo } from "react";
 import { useLaunchActivity } from "@/lib/events";
 import { usePad } from "@/lib/hooks";
@@ -8,7 +7,7 @@ import { timeAgo } from "@/lib/format";
 
 interface TickerItem {
   key: string;
-  kind: "planted";
+  kind: "created";
   label: string;
   timestamp: number;
 }
@@ -28,9 +27,9 @@ export function TickerStrip() {
   const items = useMemo<TickerItem[]>(() => {
     return creations
       .map((c) => ({
-        key: `planted-${c.token}-${c.blockNumber.toString()}`,
-        kind: "planted" as const,
-        label: `PLANTED: $${c.symbol || "???"} (${timeAgo(c.timestamp)})`,
+        key: `created-${c.token}-${c.blockNumber.toString()}`,
+        kind: "created" as const,
+        label: `CREATED: $${c.symbol || "???"} (${timeAgo(c.timestamp)})`,
         timestamp: c.timestamp,
       }))
       .sort((a, b) => b.timestamp - a.timestamp)
@@ -43,7 +42,7 @@ export function TickerStrip() {
   // whole list once for the seamless -50% loop.
   let base: TickerItem[] = items.length
     ? items
-    : [{ key: "empty", kind: "planted", label: "NOTHING PLANTED YET, BE THE FIRST", timestamp: 0 }];
+    : [{ key: "empty", kind: "created", label: "CREATE THE FIRST HOT TOKEN", timestamp: 0 }];
   while (base.length < 6) {
     base = base.concat(base.map((it, i) => ({ ...it, key: `${it.key}-pad${base.length + i}` })));
   }
@@ -67,8 +66,7 @@ export function TickerStrip() {
           {loop.map((item) => (
             <span key={item.key} className="flex items-center whitespace-nowrap">
               <span className="flex items-center gap-1.5 px-5 font-mono text-[10px] uppercase tracking-widest">
-                <Sprout className="h-3 w-3 shrink-0 text-green-500" aria-hidden />
-                <span className="text-green-400">{item.label}</span>
+                <span className="text-amber-400">{item.label}</span>
               </span>
               <span aria-hidden className="text-neutral-700">
                 &bull;
