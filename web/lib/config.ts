@@ -361,6 +361,7 @@ export function padDeployments(chainId: number): PadDeployment[] {
  */
 const HIDDEN_TOKENS = new Set<string>([
   "0x6b1855cca09b826dd9b2b6025ef4f7447de549a5", // duplicates an Ancient entry
+  "0x269641a5c27af1e760d9b1bd8d0773facd97efec", // NASSDAQ
   // Test launches removed from the production browse feed.
   "0x5f803e8d2ab77f0b72da0f4ebb97d32b98e69fc9", // TEST
   "0x86f1468b8c8e445e935468112680d850bdb3aeaa", // RG
