@@ -214,7 +214,8 @@ async function seedFromArchive() {
   const { count } = await db.from("meteora_tokens").select("mint", { count: "exact", head: true });
   if (count) return 0;
   try {
-    const raw = await readFile(path.join(process.cwd(), "data", "meteora-direct-token-history.json"), "utf8");
+    const raw = await readFile(path.join(process.cwd(), "data", "meteora-direct-token-history.json"), "utf8")
+      .catch(() => readFile(path.join(process.cwd(), "data", "radar-snapshot.json"), "utf8"));
     const archive = JSON.parse(raw) as { tokens?: MeteoraToken[] };
     const valid = (archive.tokens ?? []).filter((t) => MINT.test(t.mint) && Number.isFinite(t.feesUsd) && Number.isFinite(Number(t.poolCreatedAt)));
     return insertNew(valid.map((t) => ({ ...t, poolCreatedAt: Number(t.poolCreatedAt) })));
