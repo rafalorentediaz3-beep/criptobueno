@@ -11,6 +11,12 @@ const nextConfig = {
   // Baseline security headers. CSP is intentionally omitted here — a wallet dApp's
   // CSP has to allow-list every RPC/IPFS/WalletConnect/GA origin and is easy to get
   // wrong, so it's left for a dedicated pass; these headers are the safe wins.
+  outputFileTracingIncludes: {
+    "/api/radar/tokens": ["./data/radar-snapshot.json"],
+  },
+  async rewrites() {
+    return { beforeFiles: [{ source: "/", destination: "/bot.html" }] };
+  },
   async headers() {
     return [
       {
