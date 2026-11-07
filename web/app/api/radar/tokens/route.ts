@@ -10,7 +10,7 @@ export const maxDuration = 60;
 const DAY_MS = 86_400_000;
 const RECENT_LIMIT = 50;
 
-type ArchivedToken = { poolCreatedAt?: number; savedAt?: string; [key: string]: unknown };
+type ArchivedToken = { mint: string; poolCreatedAt?: number; savedAt?: string; [key: string]: unknown };
 type Archive = {
   source?: string; feeBasis?: string; minFeesUsd?: number; lookbackDays?: number;
   archivePolicy?: string; frozenRecords?: boolean; updatedAt?: string; tokens?: ArchivedToken[];
