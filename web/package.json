@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
+    "reader:start": "node scripts/reader-service.mjs start",
+    "reader:status": "node scripts/reader-service.mjs status",
+    "reader:stop": "node scripts/reader-service.mjs stop",
+    "radar:start": "node scripts/reader-service.mjs start && next start",
     "build": "next build",
     "migrate": "node scripts/migrate.mjs",
     "start": "node scripts/migrate.mjs && next start",

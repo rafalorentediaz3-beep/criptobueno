@@ -1,7 +1,7 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { LogOut, User, Wallet } from "lucide-react";
+import { Bot, LogOut, User, Wallet } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -63,6 +63,17 @@ export function Header() {
               }`}
             >
               Analytics
+            </Link>
+
+            <Link
+              href="/bot.html"
+              className={`relative inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-200 ${
+                pathname.startsWith("/bot")
+                  ? "bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(236,72,153,0.13))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_5px_18px_-11px_rgba(236,72,153,0.95)] ring-1 ring-pink-400/15"
+                  : "text-neutral-100/90 hover:bg-white/[0.055] hover:text-white"
+              }`}
+            >
+              <Bot className="h-4 w-4" /> Bot
             </Link>
 
             <button

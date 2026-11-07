@@ -1,0 +1,7 @@
+{
+  "source": "meteora",
+  "meteoraMinFeesUsd": 3500,
+  "meteoraFeeBasis": "lifetime",
+  "meteoraLookbackDays": 150,
+  "meteoraArchivePolicy": "append-only"
+}
