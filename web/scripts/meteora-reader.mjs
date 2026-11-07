@@ -53,6 +53,7 @@ export function meteoraCandidates(pools, minFeesUsd = 3500, { now = Date.now(), 
         feeBasis: "lifetime", feesUsd,
         // Supplementary information only; it does not determine eligibility.
         fees24hUsd: typeof pool.fees?.["24h"] === "number" ? pool.fees["24h"] : null,
+        image: typeof token.image === "string" ? token.image : typeof token.logo_uri === "string" ? token.logo_uri : null,
       });
     }
   }

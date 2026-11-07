@@ -41,6 +41,7 @@ export function dexMetadata(token, pairs, checkedAt) {
     websiteUrl: publicUrl(pair?.info.websites?.[0]?.url),
     twitterUsername: username, twitterUrl: username ? `https://x.com/${username}` : null,
     associationSource: username ? "dexscreener-exact-mint" : null,
+    imageUrl: publicUrl(pair?.info.imageUrl), imageCheckedAt: checkedAt,
     associationCheckedAt: checkedAt, associationPair: pair?.pairAddress ?? null,
   };
 }
@@ -176,8 +177,13 @@ export class TokenMetadataReader {
     if (this.stopped) return;
     try {
       const tokens = [...this.listTokens()].sort((a, b) => Number(b.poolCreatedAt) - Number(a.poolCreatedAt));
-      const missing = tokens.filter((token) => !this.metadata.get(token.mint)?.associationCheckedAt
-        || this.clock() - Date.parse(this.metadata.get(token.mint).associationCheckedAt) > 7 * DAY);
+      const missing = tokens.filter((token) => {
+        const metadata = this.metadata.get(token.mint);
+        const associationCheckedAt = Date.parse(metadata?.associationCheckedAt ?? "");
+        const imageCheckedAt = Date.parse(metadata?.imageCheckedAt ?? "");
+        return !Number.isFinite(associationCheckedAt) || this.clock() - associationCheckedAt > 7 * DAY
+          || !Number.isFinite(imageCheckedAt) || this.clock() - imageCheckedAt > 7 * DAY;
+      });
       if (missing.length) await this.associations(missing.slice(0, 30));
       const next = tokens.find((token) => {
         const metadata = this.metadata.get(token.mint);

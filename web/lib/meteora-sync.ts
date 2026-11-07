@@ -25,8 +25,8 @@ const QUOTES = new Set([
 type Pool = {
   address?: string; launchpad?: string; is_blacklisted?: boolean; created_at?: unknown;
   cumulative_metrics?: { fees?: unknown }; fees?: Record<string, unknown>;
-  token_x?: { address?: string; name?: string; symbol?: string };
-  token_y?: { address?: string; name?: string; symbol?: string };
+  token_x?: { address?: string; name?: string; symbol?: string; image?: string };
+  token_y?: { address?: string; name?: string; symbol?: string; image?: string };
 };
 export type MeteoraToken = {
   mint: string; name: string; symbol: string; poolAddress: string; poolCreatedAt: number;
@@ -37,7 +37,7 @@ export type MeteoraToken = {
 
 type DexPair = {
   chainId?: string; pairAddress?: string; baseToken?: { address?: string };
-  liquidity?: { usd?: number }; info?: {
+  liquidity?: { usd?: number }; info?: { imageUrl?: string;
     websites?: Array<{ url?: string }>;
     socials?: Array<{ type?: string; url?: string }>;
   };
@@ -56,8 +56,10 @@ function socialLinks(mint: string, pairs: DexPair[]) {
     .sort((a, b) => Number(b.liquidity?.usd ?? 0) - Number(a.liquidity?.usd ?? 0));
   let websiteUrl: string | undefined;
   let twitterUrl: string | undefined;
+  let imageUrl: string | undefined;
   let associationPair: string | null = null;
   for (const pair of matching) {
+    imageUrl ??= safeWebUrl(pair.info?.imageUrl);
     websiteUrl ??= (pair.info?.websites ?? []).map((entry) => safeWebUrl(entry.url)).find(Boolean);
     const social = (pair.info?.socials ?? []).find((entry) => {
       if (!["twitter", "x"].includes(entry.type?.toLowerCase() ?? "")) return false;
@@ -68,7 +70,7 @@ function socialLinks(mint: string, pairs: DexPair[]) {
     if ((websiteUrl || twitterUrl) && associationPair === null) associationPair = pair.pairAddress ?? null;
     if (websiteUrl && twitterUrl) break;
   }
-  return { websiteUrl, twitterUrl, associationPair };
+  return { websiteUrl, twitterUrl, associationPair, imageUrl };
 }
 
 async function enrichStoredSocials() {
@@ -83,7 +85,9 @@ async function enrichStoredSocials() {
     const stale = rows.filter((row) => {
       const metadata = (row.data as MeteoraToken)?.tokenMetadata as Record<string, unknown> | undefined;
       const checkedAt = typeof metadata?.associationCheckedAt === "string" ? Date.parse(metadata.associationCheckedAt) : 0;
-      return !Number.isFinite(checkedAt) || now - checkedAt >= SOCIAL_REFRESH_MS;
+      const imageCheckedAt = typeof metadata?.imageCheckedAt === "string" ? Date.parse(metadata.imageCheckedAt) : 0;
+      return !Number.isFinite(checkedAt) || now - checkedAt >= SOCIAL_REFRESH_MS
+        || !Number.isFinite(imageCheckedAt) || now - imageCheckedAt >= SOCIAL_REFRESH_MS;
     });
     for (let i = 0; i < stale.length; i += SOCIAL_BATCH_SIZE) {
       const batch = stale.slice(i, i + SOCIAL_BATCH_SIZE);
@@ -110,6 +114,8 @@ async function enrichStoredSocials() {
             websiteUrl: links.websiteUrl ?? previous.websiteUrl,
             twitterUrl: links.twitterUrl ?? previous.twitterUrl,
             twitterUsername: username ?? previous.twitterUsername,
+            imageUrl: links.imageUrl ?? previous.imageUrl,
+            imageCheckedAt: checkedAt,
             associationCheckedAt: checkedAt,
             associationSource: links.websiteUrl || links.twitterUrl ? "dexscreener-exact-mint" : previous.associationSource ?? null,
           };
@@ -174,6 +180,7 @@ function candidates(pools: Pool[], now: number) {
         poolAddress: pool.address, poolCreatedAt: createdAt, launchpad,
         chain: "sol", protocol: "Meteora AMM V2", source: "meteora", feeBasis: "lifetime",
         feesUsd, fees24hUsd: typeof fees24h === "number" ? fees24h : null,
+        image: safeWebUrl(token.image),
       });
     }
   }

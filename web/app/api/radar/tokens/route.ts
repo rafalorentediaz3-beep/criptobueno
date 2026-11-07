@@ -16,9 +16,9 @@ type Archive = {
   archivePolicy?: string; frozenRecords?: boolean; updatedAt?: string; tokens?: ArchivedToken[];
 };
 
-function hasWebsiteOrX(token: ArchivedToken) {
+function hasWebsiteAndX(token: ArchivedToken) {
   const metadata = token.tokenMetadata as Record<string, unknown> | undefined;
-  return Boolean(metadata?.websiteUrl || metadata?.twitterUrl || metadata?.twitterUsername);
+  return Boolean(metadata?.websiteUrl && (metadata?.twitterUrl || metadata?.twitterUsername));
 }
 
 function createdAt(token: ArchivedToken) {
@@ -44,7 +44,7 @@ async function readLiveReader() {
       databaseSync = { state: "error", inserted: 0 };
     }
   }
-  let tokens = data.tokens.filter(hasWebsiteOrX) as ArchivedToken[];
+  let tokens = data.tokens.filter(hasWebsiteAndX) as ArchivedToken[];
   let totalStored = data.totalCaptured ?? data.tokens.length;
   if (databaseSync.state === "saved") {
     try {
@@ -66,7 +66,7 @@ async function readLiveReader() {
           });
         }
       }
-      tokens = [...combined.values()].filter(hasWebsiteOrX);
+      tokens = [...combined.values()].filter(hasWebsiteAndX);
       totalStored = stored.tokens.length;
     } catch {
       // Keep the local reader response available if the archive read is unavailable.
@@ -97,7 +97,7 @@ async function readArchive() {
   const cutoff = now - lookbackDays * DAY_MS;
   const created = (token: ArchivedToken) => Number(token.poolCreatedAt) || 0;
   const storedTokens = [...(archive.tokens ?? [])].sort((a, b) => created(b) - created(a));
-  const tokens = storedTokens.filter(hasWebsiteOrX);
+  const tokens = storedTokens.filter(hasWebsiteAndX);
   const latestTokens = tokens
     .filter((token) => created(token) >= cutoff && created(token) <= now)
     .slice(0, RECENT_LIMIT);
@@ -130,7 +130,7 @@ async function readDatabase() {
   const stale = !lastPollAt || Date.now() - Date.parse(lastPollAt) > SYNC_INTERVAL_MS;
   if (stale) after(() => runMeteoraSync().catch(() => {}));
   if (!storedTokens.length && stale) throw new Error("Archive empty");
-  const tokens = storedTokens.filter(hasWebsiteOrX);
+  const tokens = storedTokens.filter(hasWebsiteAndX);
   const now = Date.now();
   const cutoff = now - LOOKBACK_DAYS * DAY_MS;
   const latestTokens = tokens
