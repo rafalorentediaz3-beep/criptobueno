@@ -404,7 +404,10 @@ export default function DiscoverPage() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = activeRows;
+    // Keep the discover feed focused on launches with both core social links.
+    let list = activeRows.filter(
+      (row) => Boolean(row.twitter?.trim()) && Boolean(row.website?.trim()),
+    );
     if (q) {
       const isAddressQuery = q.startsWith("0x");
       list = list.filter(
