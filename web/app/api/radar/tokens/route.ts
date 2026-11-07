@@ -16,6 +16,11 @@ type Archive = {
   archivePolicy?: string; frozenRecords?: boolean; updatedAt?: string; tokens?: ArchivedToken[];
 };
 
+function hasWebsiteAndX(token: ArchivedToken) {
+  const metadata = token.tokenMetadata as Record<string, unknown> | undefined;
+  return Boolean(metadata?.websiteUrl && (metadata.twitterUrl || metadata.twitterUsername));
+}
+
 async function readLiveReader() {
   const upstream = await fetch("http://127.0.0.1:3001/api/radar/tokens", {
     cache: "no-store", signal: AbortSignal.timeout(5_000),
@@ -24,7 +29,14 @@ async function readLiveReader() {
   const data = await upstream.json();
   if (!["meteora", "axiom"].includes(data.source) || !Array.isArray(data.tokens)
       || !Array.isArray(data.latestTokens) || !data.reader) throw new Error("Invalid reader response");
-  return data;
+  const tokens = data.tokens.filter(hasWebsiteAndX);
+  return {
+    ...data,
+    tokens,
+    latestTokens: data.latestTokens.filter(hasWebsiteAndX),
+    totalStored: data.totalCaptured ?? data.tokens.length,
+    totalCaptured: tokens.length,
+  };
 }
 
 // On Vercel there is no local reader process, so serve the committed append-only archive instead.
@@ -37,7 +49,8 @@ async function readArchive() {
   const now = Date.now();
   const cutoff = now - lookbackDays * DAY_MS;
   const created = (token: ArchivedToken) => Number(token.poolCreatedAt) || 0;
-  const tokens = [...(archive.tokens ?? [])].sort((a, b) => created(b) - created(a));
+  const storedTokens = [...(archive.tokens ?? [])].sort((a, b) => created(b) - created(a));
+  const tokens = storedTokens.filter(hasWebsiteAndX);
   const latestTokens = tokens
     .filter((token) => created(token) >= cutoff && created(token) <= now)
     .slice(0, RECENT_LIMIT);
@@ -53,6 +66,7 @@ async function readArchive() {
     tokens,
     latestTokens,
     totalCaptured: tokens.length,
+    totalStored: storedTokens.length,
     refreshedAt: archive.updatedAt ?? null,
     captureConnected: false,
     reader: {
@@ -65,10 +79,11 @@ async function readArchive() {
 // Vercel: every visit returns the full Supabase archive and, if the last poll is
 // older than 5 minutes, triggers a background Meteora sync after responding.
 async function readDatabase() {
-  const { tokens, lastPollAt, lastError } = await readStoredTokens();
+  const { tokens: storedTokens, lastPollAt, lastError } = await readStoredTokens();
   const stale = !lastPollAt || Date.now() - Date.parse(lastPollAt) > SYNC_INTERVAL_MS;
   if (stale) after(() => runMeteoraSync().catch(() => {}));
-  if (!tokens.length && stale) throw new Error("Archive empty");
+  if (!storedTokens.length && stale) throw new Error("Archive empty");
+  const tokens = storedTokens.filter(hasWebsiteAndX);
   const now = Date.now();
   const cutoff = now - LOOKBACK_DAYS * DAY_MS;
   const latestTokens = tokens
@@ -79,6 +94,7 @@ async function readDatabase() {
     source: "meteora", feeBasis: "lifetime", minFeesUsd: MIN_FEES_USD, retentionDays: null,
     lookbackDays: LOOKBACK_DAYS, archivePolicy: "append-only", frozenRecords: true,
     tokens, latestTokens, totalCaptured: tokens.length, refreshedAt: lastPollAt,
+    totalStored: storedTokens.length,
     captureConnected: !lastError,
     reader: lastError
       ? { state: "waiting_data", message: "No se pudo actualizar Meteora: " + lastError }

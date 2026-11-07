@@ -548,7 +548,7 @@ const server = createServer(async (request, response) => {
     response.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
     const snapshot = meteoraReader.snapshot();
     const tokens = snapshot.tokens.map((token) => tokenMetadataReader.attach(token))
-      .filter((token) => Boolean(token.tokenMetadata?.websiteUrl || token.tokenMetadata?.twitterUsername));
+      .filter((token) => Boolean(token.tokenMetadata?.websiteUrl && token.tokenMetadata?.twitterUsername));
     const createdAt = (token) => {
       const value = token.poolCreatedAt;
       if (typeof value === "number") return value < 1e12 ? value * 1000 : value;
@@ -558,7 +558,7 @@ const server = createServer(async (request, response) => {
     const latestTokens = tokens.filter((token) => createdAt(token) >= cutoff && createdAt(token) <= Date.now())
       .sort((a, b) => createdAt(b) - createdAt(a)).slice(0, 50);
     response.end(JSON.stringify({ ...snapshot, tokens, latestTokens, totalCaptured: tokens.length,
-      linkRequirement: "website-or-x", socialMetadata: tokenMetadataReader.status }));
+      linkRequirement: "website-and-x", socialMetadata: tokenMetadataReader.status }));
     return;
   }
   if (pathname.startsWith("/api/axiom/") && !axiomReader) {
