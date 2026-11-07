@@ -212,7 +212,11 @@
           recentTokens = (data.latestTokens || []).filter((t) => Number.isFinite(feeValue(t)) && feeValue(t) >= minimum);
           const scan = data.reader?.fullScan;
           const progress = scan?.running ? ' | Histórico ' + lookbackDays + ' d: ' + scan.poolsScanned + ' pools revisados' : '';
-          $('pollStatus').textContent = (data.reader?.message || 'Esperando datos') + ' | ' + (Number(data.totalCaptured) || 0) + ' tokens guardados | ' + (meteora ? 'archivo acumulativo' : 'archivo 30 d') + progress;
+          const databaseSync = data.databaseSync;
+          const databaseStatus = !databaseSync ? '' : databaseSync.state === 'saved' ? ' | Supabase sincronizado' + (databaseSync.inserted ? ' (+' + databaseSync.inserted + ')' : '')
+            : databaseSync.state === 'not_configured' ? ' | Supabase sin configurar'
+            : ' | Error de sincronización con Supabase';
+          $('pollStatus').textContent = (data.reader?.message || 'Esperando datos') + ' | ' + (Number(data.totalCaptured) || 0) + ' tokens guardados | ' + (meteora ? 'archivo acumulativo' : 'archivo 30 d') + progress + databaseStatus;
           $('connectAxiom').textContent = data.reader?.state === 'receiving' ? 'Ver Axiom del bot' : 'Conectar Axiom';
           const priceText = meteora ? 'Fees y fecha de cada registro fijadas al guardar · mínimo ' + fmt(minimum) : data.solPriceUsd == null ? 'Precio SOL/USD pendiente; filtro en dólares en espera' : 'SOL USD ' + Number(data.solPriceUsd).toFixed(2);
           $('updated').textContent = data.latestObservation ? (meteora ? 'Última comprobación ' : 'Última lectura ') + new Date(data.latestObservation).toLocaleString() + ' | ' + priceText + (data.taxPendingCount ? ' | Tax pendiente en ' + data.taxPendingCount + ' tokens' : '') : 'Todavía no han entrado lecturas de tokens. ' + (data.reader?.message || 'Esperando datos.');

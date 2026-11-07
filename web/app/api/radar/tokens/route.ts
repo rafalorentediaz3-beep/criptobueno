@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { after, NextResponse } from "next/server";
-import { LOOKBACK_DAYS, MIN_FEES_USD, readStoredTokens, runMeteoraSync, SYNC_INTERVAL_MS } from "@/lib/meteora-sync";
+import { LOOKBACK_DAYS, MIN_FEES_USD, readStoredTokens, runMeteoraSync, SYNC_INTERVAL_MS, syncLocalReaderTokens } from "@/lib/meteora-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,9 +29,20 @@ async function readLiveReader() {
   const data = await upstream.json();
   if (!["meteora", "axiom"].includes(data.source) || !Array.isArray(data.tokens)
       || !Array.isArray(data.latestTokens) || !data.reader) throw new Error("Invalid reader response");
+  let databaseSync: { state: "saved" | "not_configured" | "error"; inserted: number } = {
+    state: "not_configured", inserted: 0,
+  };
+  if (process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+    try {
+      databaseSync = { state: "saved", inserted: await syncLocalReaderTokens(data.tokens) };
+    } catch {
+      databaseSync = { state: "error", inserted: 0 };
+    }
+  }
   const tokens = data.tokens.filter(hasWebsiteAndX);
   return {
     ...data,
+    databaseSync,
     tokens,
     latestTokens: data.latestTokens.filter(hasWebsiteAndX),
     totalStored: data.totalCaptured ?? data.tokens.length,
@@ -108,7 +119,7 @@ export async function GET() {
     return NextResponse.json(await readLiveReader(), { headers });
   } catch {
     try {
-      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      if (process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
         return NextResponse.json(await readDatabase(), { headers });
       }
     } catch {}

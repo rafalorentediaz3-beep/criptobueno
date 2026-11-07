@@ -203,10 +203,32 @@ async function insertNew(tokens: MeteoraToken[]) {
       data: { ...token, firstSeenAt: token.firstSeenAt || stamp, savedAt: stamp, frozen: true },
     };
   });
-  const { data, error } = await requireSupabase().from("meteora_tokens")
-    .upsert(rows, { onConflict: "mint", ignoreDuplicates: true }).select("mint");
-  if (error) throw new Error(error.message);
-  return data?.length ?? 0;
+  const db = requireSupabase();
+  let inserted = 0;
+  for (let offset = 0; offset < rows.length; offset += 100) {
+    const { data, error } = await db.from("meteora_tokens")
+      .upsert(rows.slice(offset, offset + 100), { onConflict: "mint", ignoreDuplicates: true }).select("mint");
+    if (error) throw new Error(error.message);
+    inserted += data?.length ?? 0;
+  }
+  return inserted;
+}
+
+/** Append tokens returned by the local reader without changing frozen records. */
+export async function syncLocalReaderTokens(input: unknown) {
+  if (!Array.isArray(input)) return 0;
+  const tokens = input.filter((value): value is MeteoraToken => {
+    if (!value || typeof value !== "object") return false;
+    const token = value as Partial<MeteoraToken>;
+    return MINT.test(String(token.mint ?? ""))
+      && token.source === "meteora"
+      && token.feeBasis === "lifetime"
+      && token.launchpad?.trim().toLowerCase() === "met-dbc"
+      && Number.isFinite(Number(token.poolCreatedAt))
+      && Number.isFinite(token.feesUsd)
+      && Number(token.feesUsd) >= MIN_FEES_USD;
+  });
+  return insertNew(tokens);
 }
 
 async function seedFromArchive() {

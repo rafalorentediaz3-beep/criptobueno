@@ -60,7 +60,7 @@ export function meteoraCandidates(pools, minFeesUsd = 3500, { now = Date.now(), 
 }
 
 export class MeteoraReader {
-  constructor({ minFeesUsd = 3500, lookbackDays = 150, archiveUrl = ARCHIVE, fetcher = fetch, clock = Date.now } = {}) {
+  constructor({ minFeesUsd = 3500, lookbackDays = 150, archiveUrl = ARCHIVE, fetcher = fetch, clock = Date.now, syncDatabase = null } = {}) {
     if (!Number.isFinite(minFeesUsd) || minFeesUsd < 0) throw new Error("Mínimo de fees Meteora no válido.");
     if (!Number.isFinite(lookbackDays) || lookbackDays <= 0) throw new Error("Ventana de descubrimiento Meteora no válida.");
     this.minFeesUsd = minFeesUsd;
@@ -68,6 +68,7 @@ export class MeteoraReader {
     this.clock = clock;
     this.archiveUrl = archiveUrl;
     this.fetcher = fetcher;
+    this.syncDatabase = syncDatabase;
     this.tokens = new Map();
     this.revision = 0;
     this.savedRevision = -1;
@@ -204,6 +205,10 @@ export class MeteoraReader {
         this.observe(data.data);
       }
       await this.save();
+      if (this.syncDatabase) {
+        try { this.status.databaseSync = await this.syncDatabase(); }
+        catch { this.status.databaseSync = { state: "error", inserted: 0 }; }
+      }
     } catch (error) { this.failure(error); }
     finally { if (!this.stopped) this.pollTimer = setTimeout(() => void this.poll(), Math.max(0, POLL_INTERVAL_MS - (Date.now() - startedAt))); }
   }

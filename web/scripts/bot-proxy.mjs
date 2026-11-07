@@ -489,7 +489,24 @@ const axiomArchiveReady = ACTIVE_SOURCE === "axiom" ? loadAxiomArchive() : Promi
 let axiomSolPriceUsd = null;
 let axiomSolPriceUpdatedAt = 0;
 let axiomPriceAttemptAt = 0;
-const meteoraReader = ACTIVE_SOURCE === "meteora" ? new MeteoraReader({ minFeesUsd: radarConfig.meteoraMinFeesUsd, lookbackDays: radarConfig.meteoraLookbackDays }) : null;
+async function syncLocalMeteoraArchive() {
+  try {
+    const response = await fetch("http://127.0.0.1:3000/api/radar/tokens", {
+      cache: "no-store", signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return { state: "unavailable", inserted: 0 };
+    const result = await response.json();
+    return result.databaseSync ?? { state: "unavailable", inserted: 0 };
+  } catch {
+    return { state: "unavailable", inserted: 0 };
+  }
+}
+
+const meteoraReader = ACTIVE_SOURCE === "meteora" ? new MeteoraReader({
+  minFeesUsd: radarConfig.meteoraMinFeesUsd,
+  lookbackDays: radarConfig.meteoraLookbackDays,
+  syncDatabase: syncLocalMeteoraArchive,
+}) : null;
 let axiomReader = null;
 if (ACTIVE_SOURCE === "axiom") {
   const { NativeAxiomReader } = await import("./axiom-native-reader.mjs");

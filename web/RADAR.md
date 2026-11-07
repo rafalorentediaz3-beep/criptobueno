@@ -22,6 +22,8 @@ La fuente DAMM v2 proporciona pools de negociación. No certifica que un token f
 ## Actualización y archivo
 
 - La página consulta `/api/radar/tokens` en su propio servidor cada cinco minutos; el botón Actualizar ahora permite una consulta manual.
+- En modo Meteora, el lector local pide esa ruta tras cada consulta de cinco minutos. La ruta copia a `meteora_tokens` los registros nuevos que cumplen los filtros; usa `ignoreDuplicates` para no sustituir datos congelados.
+- Para guardar desde localhost, configura `SUPABASE_URL` y `SUPABASE_SECRET_KEY` o `SUPABASE_SERVICE_ROLE_KEY` en `web/.env.local`. El monitor indica si Supabase está sincronizado, sin configurar o si hubo un error.
 - El lector consulta los pools activos y más recientes con un intervalo objetivo de cinco minutos, sujeto a la respuesta de Meteora.
 - El barrido histórico pagina de más reciente a más antiguo y termina al superar la ventana de 150 días. Se inicia al arrancar y se repite 15 minutos después de terminar. Puede tardar varios minutos: su avance aparece en el monitor.
 - Los 150 días limitan la incorporación inicial de cada token. La ventana avanza con el tiempo para seguir añadiendo tokens nuevos.
