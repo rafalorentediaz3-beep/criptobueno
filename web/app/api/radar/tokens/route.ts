@@ -16,9 +16,14 @@ type Archive = {
   archivePolicy?: string; frozenRecords?: boolean; updatedAt?: string; tokens?: ArchivedToken[];
 };
 
-function hasWebsiteAndX(token: ArchivedToken) {
+function hasWebsiteOrX(token: ArchivedToken) {
   const metadata = token.tokenMetadata as Record<string, unknown> | undefined;
-  return Boolean(metadata?.websiteUrl && (metadata.twitterUrl || metadata.twitterUsername));
+  return Boolean(metadata?.websiteUrl || metadata?.twitterUrl || metadata?.twitterUsername);
+}
+
+function createdAt(token: ArchivedToken) {
+  const value = Number(token.poolCreatedAt) || 0;
+  return value < 1e12 ? value * 1000 : value;
 }
 
 async function readLiveReader() {
@@ -39,13 +44,44 @@ async function readLiveReader() {
       databaseSync = { state: "error", inserted: 0 };
     }
   }
-  const tokens = data.tokens.filter(hasWebsiteAndX);
+  let tokens = data.tokens.filter(hasWebsiteOrX) as ArchivedToken[];
+  let totalStored = data.totalCaptured ?? data.tokens.length;
+  if (databaseSync.state === "saved") {
+    try {
+      const stored = await readStoredTokens();
+      const combined = new Map<string, ArchivedToken>(stored.tokens.map((token) => [token.mint, token as ArchivedToken] as const));
+      for (const token of tokens) {
+        const existing = combined.get(token.mint);
+        if (!existing) combined.set(token.mint, token);
+        else {
+          const existingMetadata = (existing.tokenMetadata ?? {}) as Record<string, unknown>;
+          const liveMetadata = (token.tokenMetadata ?? {}) as Record<string, unknown>;
+          const existingTwitter = (existing.tokenTwitter ?? {}) as Record<string, unknown>;
+          const liveTwitter = (token.tokenTwitter ?? {}) as Record<string, unknown>;
+          combined.set(token.mint, {
+            ...token,
+            ...existing,
+            tokenMetadata: { ...liveMetadata, ...existingMetadata },
+            tokenTwitter: { ...liveTwitter, ...existingTwitter },
+          });
+        }
+      }
+      tokens = [...combined.values()].filter(hasWebsiteOrX);
+      totalStored = stored.tokens.length;
+    } catch {
+      // Keep the local reader response available if the archive read is unavailable.
+    }
+  }
+  tokens.sort((a, b) => createdAt(b) - createdAt(a));
+  const cutoff = Date.now() - (data.lookbackDays ?? LOOKBACK_DAYS) * DAY_MS;
+  const latestTokens = tokens.filter((token) => createdAt(token) >= cutoff && createdAt(token) <= Date.now())
+    .slice(0, RECENT_LIMIT);
   return {
     ...data,
     databaseSync,
     tokens,
-    latestTokens: data.latestTokens.filter(hasWebsiteAndX),
-    totalStored: data.totalCaptured ?? data.tokens.length,
+    latestTokens,
+    totalStored,
     totalCaptured: tokens.length,
   };
 }
@@ -61,7 +97,7 @@ async function readArchive() {
   const cutoff = now - lookbackDays * DAY_MS;
   const created = (token: ArchivedToken) => Number(token.poolCreatedAt) || 0;
   const storedTokens = [...(archive.tokens ?? [])].sort((a, b) => created(b) - created(a));
-  const tokens = storedTokens.filter(hasWebsiteAndX);
+  const tokens = storedTokens.filter(hasWebsiteOrX);
   const latestTokens = tokens
     .filter((token) => created(token) >= cutoff && created(token) <= now)
     .slice(0, RECENT_LIMIT);
@@ -82,7 +118,7 @@ async function readArchive() {
     captureConnected: false,
     reader: {
       state: "archive",
-      message: "Archivo guardado" + (archive.updatedAt ? " · " + new Date(archive.updatedAt).toLocaleString("es-ES", { timeZone: "Europe/Madrid" }) : ""),
+      message: "Archivo guardado" + (archive.updatedAt ? " Â· " + new Date(archive.updatedAt).toLocaleString("es-ES", { timeZone: "Europe/Madrid" }) : ""),
     },
   };
 }
@@ -94,7 +130,7 @@ async function readDatabase() {
   const stale = !lastPollAt || Date.now() - Date.parse(lastPollAt) > SYNC_INTERVAL_MS;
   if (stale) after(() => runMeteoraSync().catch(() => {}));
   if (!storedTokens.length && stale) throw new Error("Archive empty");
-  const tokens = storedTokens.filter(hasWebsiteAndX);
+  const tokens = storedTokens.filter(hasWebsiteOrX);
   const now = Date.now();
   const cutoff = now - LOOKBACK_DAYS * DAY_MS;
   const latestTokens = tokens
@@ -109,7 +145,7 @@ async function readDatabase() {
     captureConnected: !lastError,
     reader: lastError
       ? { state: "waiting_data", message: "No se pudo actualizar Meteora: " + lastError }
-      : { state: "receiving", message: "Buscando nuevos tokens en Meteora cada 5 min. Archivo acumulativo" + (when ? " · " + when : "") },
+      : { state: "receiving", message: "Buscando nuevos tokens en Meteora cada 5 min. Archivo acumulativo" + (when ? " Â· " + when : "") },
   };
 }
 
@@ -126,7 +162,7 @@ export async function GET() {
     try {
       return NextResponse.json(await readArchive(), { headers });
     } catch {
-      return NextResponse.json({ error: "El lector del servidor no está disponible. Esperando a que se restablezca la lectura." }, { status: 503, headers });
+      return NextResponse.json({ error: "El lector del servidor no estÃ¡ disponible. Esperando a que se restablezca la lectura." }, { status: 503, headers });
     }
   }
 }
