@@ -1,0 +1,3 @@
+{
+  "crons": [{ "path": "/api/radar/sync", "schedule": "0 6 * * *" }]
+}
